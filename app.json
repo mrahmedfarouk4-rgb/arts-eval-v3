@@ -65,7 +65,10 @@
     "extra": {
       "supabaseUrl": "",
       "supabaseAnonKey": "",
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "6bf3df3a-2d99-48c2-9631-b10982cab2e3"
+      }
     },
     "owner": "11aaa"
   }
