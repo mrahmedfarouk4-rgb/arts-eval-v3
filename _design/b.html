@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>تصميم ب — الأسبوع</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#EDF1F6}
+.wrap{display:flex;gap:22px;padding:22px;align-items:flex-start;min-height:100vh}
+.col{display:flex;flex-direction:column;gap:9px}
+.cap{color:#15202B;font-size:12.5px;font-weight:700}
+.cap span{color:#7C8794;font-weight:400;font-size:11px;margin-right:8px}
+.phone{width:366px;height:800px;border-radius:34px;overflow:hidden;background:#fff;
+  box-shadow:0 26px 60px rgba(20,35,55,.28);display:flex;flex-direction:column}
+.whead{display:flex;align-items:center;gap:9px;padding:13px 15px 7px}
+.whead .mn{flex:1}
+.whead .mn b{font-size:16px;display:block}
+.whead .mn small{font-size:11px;color:#6B7785}
+.navb{width:30px;height:30px;border-radius:9px;border:1px solid #DCE3EA;display:flex;
+  align-items:center;justify-content:center;color:#5C6673;font-size:14px}
+.strip{display:flex;align-items:center;gap:9px;margin:2px 15px 10px;padding:10px 12px;
+  border-radius:11px;background:#EEF3F9}
+.strip b{font-size:12px}
+.strip small{font-size:10.5px;color:#5C6673;margin-right:auto}
+.meter{width:70px;height:6px;border-radius:3px;background:#DCE3EA;overflow:hidden;flex:none}
+.meter i{display:block;height:100%;width:66%;background:#0F2837}
+.days{display:flex;gap:5px;padding:0 15px;flex:1}
+.day{flex:1;min-width:0;display:flex;flex-direction:column}
+.dh{text-align:center;font-size:10px;color:#6B7785;padding-bottom:5px}
+.dn{text-align:center;font-size:16px;font-weight:800;padding:5px 0;border-radius:10px}
+.day.today .dn{background:#0F2837;color:#fff}
+.col2{margin-top:7px;background:#F6F8FA;border-radius:11px;padding:5px;flex:1;border:1px solid transparent}
+.day.today .col2{background:#F1F5F9;border-color:#0F2837}
+.ev{background:#fff;border-radius:9px;padding:8px;margin-bottom:5px;
+  border-right:3px solid #0F2837;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.ev.g{border-right-color:#1B7A42}
+.ev.v{border-right-color:#9056A1}
+.ev b{font-size:10.5px;display:block}
+.ev small{font-size:9px;color:#6B7785}
+.pill{display:inline-block;font-size:8.5px;padding:2px 6px;border-radius:999px;
+  background:#FBE122;color:#0F2837;font-weight:700;margin-top:4px}
+.tally{margin-top:5px;height:3px;border-radius:2px;background:#E3E9EF;overflow:hidden}
+.tally i{display:block;height:100%;background:#0F2837}
+.tabbar{display:flex;border-top:1px solid #E3E9EF}
+.tabbar div{flex:1;text-align:center;font-size:10px;padding:12px 0;color:#6B7785}
+.tabbar div.on{color:#0F2837;font-weight:800;border-top:2px solid #FBE122;margin-top:-1px}
+.ai{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid #EDF1F5}
+.ai .tm{width:48px;flex:none;font-size:11px;color:#6B7785;font-variant-numeric:tabular-nums}
+.ai .av{width:34px;height:34px;border-radius:9px;background:#EEF3F9;display:flex;
+  align-items:center;justify-content:center;font-size:14px;flex:none}
+.ai .bd{flex:1}
+.ai .bd b{font-size:13px;display:block}
+.ai .bd small{font-size:10.5px;color:#6B7785;line-height:1.5;display:block;margin-top:2px}
+.ai.done .bd b{text-decoration:line-through;color:#9AA6B2}
+.note{margin:14px 15px;padding:12px;border-radius:11px;background:#FBF7E8;border:1px solid #F0E2B4;
+  font-size:11px;color:#7A6A22;line-height:1.65}
+</style></head>
+<body>
+<div class="wrap">
+
+  <div class="col">
+    <div class="cap">٢ · الأسبوع <span>الرئيسية — جدول أسبوعي (Google Calendar / Cal.com)</span></div>
+    <div class="phone">
+      <div class="whead">
+        <div class="mn"><b>الأسبوع ٤</b><small>١٨ – ٢٢ أكتوبر ٢٠٢٦</small></div>
+        <div class="navb">›</div><div class="navb">‹</div>
+      </div>
+      <div class="strip"><b>١٢ من ١٨ مكتملة</b><small>الإنجاز ٦٦٪</small>
+        <div class="meter"><i></i></div></div>
+      <div class="days">
+        <div class="day today"><div class="dh">الأحد</div><div class="dn">١٨</div>
+          <div class="col2">
+            <div class="ev"><b>سلمان · الرسم</b><small>٥ طلاب</small><span class="pill">تكويني</span>
+              <div class="tally"><i style="width:60%"></i></div></div>
+            <div class="ev g"><b>ندى · الرسم</b><small>٤ طلاب</small><span class="pill">مرحلي</span>
+              <div class="tally"><i style="width:25%"></i></div></div>
+          </div></div>
+        <div class="day"><div class="dh">الاثنين</div><div class="dn">١٩</div>
+          <div class="col2"><div class="ev v"><b>فهد · أساسيات</b><small>٦ طلاب</small><span class="pill">ختامي</span>
+            <div class="tally"><i style="width:0"></i></div></div></div></div>
+        <div class="day"><div class="dh">الثلاثاء</div><div class="dn">٢٠</div>
+          <div class="col2"><div class="ev"><b>ريم · ألوان</b><small>٥ طلاب</small><span class="pill">تكويني</span>
+            <div class="tally"><i style="width:0"></i></div></div></div></div>
+        <div class="day"><div class="dh">الأربعاء</div><div class="dn">٢١</div>
+          <div class="col2"><div class="ev g"><b>ماجد · ختامي</b><small>٧ طلاب</small><span class="pill">ختامي</span>
+            <div class="tally"><i style="width:0"></i></div></div></div></div>
+        <div class="day"><div class="dh">الخميس</div><div class="dn">٢٢</div>
+          <div class="col2"></div></div>
+      </div>
+      <div class="tabbar"><div class="on">الأسبوع</div><div>الطلاب</div><div>السجل</div><div>الإعدادات</div></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="cap">جدول أعمال اليوم <span>نمط الخط الزمني — لا بطاقات</span></div>
+    <div class="phone">
+      <div class="whead"><div class="mn"><b>الأحد ١٨ أكتوبر</b><small>٤ تقييمات · ٢ مكتملة</small></div>
+        <div class="navb">›</div></div>
+      <div class="ai done"><span class="tm">٠٩:٣٠</span><span class="av">✓</span>
+        <div class="bd"><b>سلمان · أساسيات الرسم</b>
+          <small>التقييم التكويني · الوحدة الثانية · ١٨ من ٢٠ درجة</small></div></div>
+      <div class="ai"><span class="tm">١٠:١٥</span><span class="av">✎</span>
+        <div class="bd"><b>ندى · أساسيات الرسم</b>
+          <small>التقويم المرحلي · ٤ طلاب متبقّون · ٢٤ من ٦٠</small></div></div>
+      <div class="ai"><span class="tm">١١:٠٠</span><span class="av">◑</span>
+        <div class="bd"><b>فهد · الألوان المائية</b>
+          <small>التقويم الختامي · لم يبدأ</small></div></div>
+      <div class="ai"><span class="tm">١٢:٣٠</span><span class="av">＋</span>
+        <div class="bd"><b>إضافة تقييم</b><small>اختر طالباً ومقرراً</small></div></div>
+      <div class="note">التقييم مرتبط بالوحدة لا بالتاريخ: الوحدة الثانية تستحق الرصد
+        في أيّ يوم خلال أسبوعها.</div>
+      <div class="tabbar"><div class="on">الأسبوع</div><div>الطلاب</div><div>السجل</div><div>الإعدادات</div></div>
+    </div>
+  </div>
+
+</div>
+</body></html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>٣ · منصة الفريق — Collaborative Intelligence</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#EDE9E2;color:#15202B}
+.wrap{padding:24px;min-height:100vh}
+.cap{color:#15202B;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#8A7F6E;font-weight:400;font-size:11px;margin-right:8px}
+.grid{display:grid;grid-template-columns:280px 1fr;gap:16px}
+.side{background:#FCFCFA;border:1px solid #EAE5DC;border-radius:14px;padding:16px;height:fit-content;position:sticky;top:24px}
+.side h4{font-size:11px;color:#7A7267;letter-spacing:.3px;margin-bottom:12px}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:#7A7267;font-size:12.5px;text-decoration:none}
+.nav a:hover{background:#F4F1EA}
+.nav a.on{background:#FBE122;color:#621244;font-weight:700}
+.nav .cnt{margin-right:auto;font-size:10px;color:#C0B6A4;background:#F4F1EA;padding:2px 6px;border-radius:999px}
+.main{display:flex;flex-direction:column;gap:16px}
+.card{background:#fff;border:1px solid #EAE5DC;border-radius:14px;overflow:hidden}
+.card.hd{padding:14px 18px;border-bottom:1px solid #EAE5DC;display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:13px;font-weight:700;color:#15202B}
+.card.hd .act{font-size:11px;color:#621244;cursor:pointer}
+.proj{padding:14px 18px}
+.pitem{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #EAE5DC}
+.pitem:last-child{border:0}
+.pitem .ic{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+.pitem .ic.p{background:#FDE7C8;color:#7A3C12}
+.pitem .ic.r{background:#D9EAFB;color:#262674}
+.pitem .ic.a{background:#FAE3EF;color:#621244}
+.pitem .ic.b{background:#E8F4EA;color:#1B7A42}
+.pitem .tx{flex:1}
+.pitem .tx b{font-size:13px;display:block}
+.pitem .tx small{font-size:11px;color:#8A7F6E;display:block;margin-top:2px}
+.pitem .prog{width:60px;height:5px;border-radius:3px;background:#EAE5DC;overflow:hidden;flex:none}
+.pitem .prog i{display:block;height:100%;background:#621244}
+.kb{padding:14px 18px}
+.kitem{padding:12px 0;border-bottom:1px solid #EAE5DC}
+.kitem:last-child{border:0}
+.kitem .tag{display:inline-block;font-size:9px;padding:2px 6px;border-radius:4px;background:#F4F1EA;color:#621244;margin-bottom:4px}
+.kitem h5{font-size:12.5px;font-weight:600;margin-bottom:2px}
+.kitem small{font-size:10.5px;color:#8A7F6E;line-height:1.5}
+.disc{padding:14px 18px}
+.ditem{padding:12px 0;border-bottom:1px solid #EAE5DC}
+.ditem:last-child{border:0}
+.ditem .head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.ditem .avatar{width:28px;height:28px;border-radius:50%;background:conic-gradient(from 0deg,#FBE122,#1B7A42,#007886,#9056A1,#FBE122);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#0F1115;flex:none}
+.ditem .meta{font-size:10px;color:#A99E8B}
+.ditem p{font-size:12px;color:#7A726E;line-height:1.6}
+.ditem .rpl{margin-top:6px;padding:8px 12px;background:#F4F1EA;border-radius:8px;font-size:11px;color:#7A726E}
+.rpts{padding:14px 18px}
+.rpt{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #EAE5DC}
+.rpt:last-child{border:0}
+.rpt .ic{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.rpt .ic.w{background:#FBF7E8;color:#7A6A22}
+.rpt .ic.m{background:#E8F4EA;color:#1B7A42}
+.rpt .ic.q{background:#FDE7E8;color:#C03944}
+.rpt .tx{flex:1}
+.rpt .tx b{font-size:12px;display:block}
+.rpt .tx small{font-size:10px;color:#8A7F6E;display:block}
+.rpt .frq{font-size:10px;color:#A99E8B;background:#F4F1EA;padding:2px 8px;border-radius:999px}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="cap">٣ · منصة الفريق <span>Collaborative Intelligence — للفريق بأكمله (معلمون + مشرفون + إدارة)</span></div>
+  <div class="grid">
+    <aside class="side">
+      <h4>التنقّل</h4>
+      <nav class="nav">
+        <a class="on" href="#"><span>📁</span><span>المشاريع النشطة</span><span class="cnt">٤</span></a>
+        <a href="#"><span>📚</span><span>قاعدة المعرفة</span><span class="cnt">١٢</span></a>
+        <a href="#"><span>💬</span><span>النقاشات</span><span class="cnt">٨</span></a>
+        <a href="#"><span>📊</span><span>التقارير التلقائية</span><span class="cnt">٣</span></a>
+        <a href="#"><span>👥</span><span>الفريق</span><span class="cnt">٢٣</span></a>
+        <a href="#"><span>⚙️</span><span>الإعدادات</span></a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="cap">٣ · منصة الفريق <span>Collaborative Intelligence — للفريق بأكمله</span></div>
+
+      <div class="card">
+        <div class="card hd"><h3>المشاريع النشطة</h3><span class="act">جديد</span></div>
+        <div class="proj">
+          <div class="pitem"><span class="ic p">📋</span><div class="tx"><b>خطة الفصل الدراسي الأول</b><small>١٢ معلم · ٣ مراحل · ٧ مقررات</small></div><div class="prog"><i style="width:90%"></i></div></div>
+          <div class="pitem"><span class="ic r">📝</span><div class="tx"><b>التقييم التكويني للوحدة ٣</b><small>٧ معلمين · ٣ أيام متبقية</small></div><div class="prog"><i style="width:65%"></i></div></div>
+          <div class="pitem"><span class="ic a">🎨</span><div class="tx"><b>مراجعة استمارات «الفنون السعودية»</b><small>قيد المراجعة · ٤ مشرفين</small></div><div class="prog"><i style="width:40%"></i></div></div>
+          <div class="pitem"><span class="ic b">📦</span><div class="tx"><b>أرشيف الفصل الماضي</b><small>مؤرشف · قابل للبحث · ٤٧ وثيقة</small></div><div class="prog"><i style="width:100%"></i></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card hd"><h3>قاعدة المعرفة المشتركة</h3><span class="act">إضافة</span></div>
+        <div class="kb">
+          <div class="kitem"><span class="tag">فيديو</span><h5>كيفية ملء استمارة التقييم التكويني</h5><small>٣ دقائق · ١٤٧ مشاهدة · أضيف قبل أسبوع</small></div>
+          <div class="kitem"><span class="tag">مستند</span><h5>معايير التصحيح الموحدة</h5><small>مستند حي · ١٢ مساهماً · آخر تعديل أمس</small></div>
+          <div class="kitem"><span class="tag">ويكي</span><h5>الأخطاء الشائعة في تصحيح الألوان المائية</h5><small>٨ نقاط · ٣ مساهمين · آخر تعديل قبل ٣ أيام</small></div>
+          <div class="kitem"><span class="tag">قالب</span><h5>نموذج خطة دراسية معتمد</h5><small>جاهز للنسخ · ٢٣ استخدام هذا الشهر</small></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card hd"><h3>النقاشات المركزة</h3><span class="act">جديد</span></div>
+        <div class="disc">
+          <div class="ditem">
+            <div class="head"><div class="avatar">أ</div><div class="meta"><b>أ. عبدالله الحربي</b><span>· قبل ساعتين</span></div></div>
+            <p>تعديل معيار «التظليل» في أساسيات الرسم — هل نرفعه من ٧ إلى ٨ درجات؟</p>
+            <div class="rpl"><b>أ. سارة العتيبي:</b> موافق — المعيار الحالي منخفض مقارنة بالمنهج</div>
+            <div class="rpl"><b>أ. محمد العتيبي:</b> أفضّل ٧.٥ كنقطة وسط</div>
+          </div>
+          <div class="ditem">
+            <div class="head"><div class="avatar">س</div><div class="meta"><b>أ. سارة العتيبي</b><span>· أمس</span></div></div>
+            <p>موعد تسليم استمارات الفصل الثاني — قرار معتمد: الأحد القادم ٨ صباحاً</p>
+            <div class="rpl"><b>المشرف العام:</b> تم التثبيت — سيصل إشعار للجميع</div>
+          </div>
+          <div class="ditem">
+            <div class="head"><div class="avatar">م</div><div class="meta"><b>أ. ماجد الشمري</b><span>· قبل ٣ أيام</span></div></div>
+            <p>مشكلة في استمارة «الفنون السعودية» للصف الخامس — البنود لا تطابق المنهج</p>
+            <div class="rpl"><b>أ. هند العتيبي:</b> راجعناها — البنود ٥-٧ تحتاج تحديث</div>
+          </div>
+        </div>
+
+      <div class="card">
+        <div class="card hd"><h3>التقارير التلقائية</h3></div>
+        <div class="rpts">
+          <div class="rpt"><span class="ic w">📊</span><div class="tx"><b>ملخص أسبوعي لكل معلم</b><small>يرسل الأحد ٨:٠٠ صباحاً · ١٢ مستلم</small></div><span class="frq">أسبوعي</span></div>
+          <div class="rpt"><span class="ic m">📈</span><div class="tx"><b>ملخص شهري للمشرف</b><small>يرسل أول كل شهر · ٣ مشرفين</small></div><span class="frq">شهري</span></div>
+          <div class="rpt"><span class="ic q">📄</span><div class="tx"><b>تقرير ربع سنوي للإدارة</b><small>PDF موقّع · يرسل للبريد الرسمي · ١٥ من كل ربع</small></div><span class="frq">ربع سنوي</span></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body></html>

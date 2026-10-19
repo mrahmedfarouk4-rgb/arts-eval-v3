@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>ج — مرسم الفنان — Atelier Studio Workspace</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#F5F3F0;color:#2D2623}
+.wrap{padding:24px;min-height:100vh}
+.cap{color:#3D2B1F;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#8B7E6B;font-weight:400;font-size:11px;margin-right:8px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.kpi{background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:20px;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:4px}
+.kpi:nth-child(1)::before{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.kpi:nth-child(2)::before{background:linear_gradent(90deg,#1B6B5E,#2E9B7E)}
+.kpi:nth-child(3)::before{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+.kpi:nth-child(4)::before{background:linear-gradient(90deg,#B85C3A,#C87A5A)}
+.kpi .v{font-size:30px;font-weight:800;color:#2D2623;letter-spacing:-0.5px;line-height:1}
+.kpi .u{font-size:11px;color:#8B7E6B;margin-top:4px}
+.kpi .t{font-size:11px;color:#8B7E6B;margin-top:8px;font-weight:600}
+.kpi .t::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}
+.kpi:nth-child(1) .t::before{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.kpi:nth-child(2) .t::before{background:linear-gradient(90deg,#1B6B5E,#2E9B7E)}
+.kpi:nth-child(3) .t::before{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+.kpi:nth-child(4) .t::before{background:linear-gradient(90deg,#B85C3A,#C87A5A)}
+.card{background:#fff;border:1px solid #E8E4DF;border-radius:14px;overflow:hidden}
+.card.hd{padding:14px 20px;border-bottom:1px solid #E8E4DF;display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:14px;font-weight:700;color:#2D2623}
+.card.hd .act{font-size:11px;color:#C47A2D;cursor:pointer}
+.workspace{display:grid;grid-template-columns:280px 1fr;gap:16px}
+.sidebar{background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:16px;height:fit-content;position:sticky;top:24px}
+.side-hd{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #E8E4DF}
+.side-hd .av{width:40px;height:40px;border-radius:50%;background:conic-gradient(from 0deg,#C47A2D,#1B6B5E,#2A4B8C,#B85C3A,#C47A2D);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex:none}
+.side-hd .tx{flex:1}
+.side-hd .tx b{font-size:13px;color:#2D2623}
+.side-hd .tx small{font-size:10px;color:#8B7E6B;display:block}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:#5D524A;font-size:12.5px;text-decoration:none}
+.nav a:hover{background:#FAF8F5}
+.nav a.on{background:#FFF3D0;color:#C47A2D;font-weight:700}
+.nav .cnt{margin-right:auto;font-size:10px;color:#8B7E6B;background:#F5F3F0;padding:2px 6px;border-radius:999px}
+.main{display:flex;flex-direction:column;gap:16px}
+.canvas{background:#fff;border:1px solid #E8E4DF;border-radius:14px;overflow:hidden}
+.canvas.hd{padding:14px 20px;border-bottom:1px solid #E8E4DF;display:flex;align-items:center;justify-content:space-between}
+.canvas.hd h3{font-size:14px;font-weight:700;color:#2D2623}
+.canvas.hd .act{font-size:11px;color:#C47A2D;cursor:pointer}
+.palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;padding:16px}
+.swatch{background:#fff;border:1px solid #E8E4DF;border-radius:12px;padding:14px;text-align:center;transition:transform .2s,box-shadow .2s}
+.swatch:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(45,38,35,.1)}
+.swatch .dot{width:56px;height:56px;border-radius:50%;margin:0 auto 10px;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.swatch .dot.o{background:linear-gradient(135deg,#C47A2D,#D49A4A)}
+.swatch .dot.v{background:linear-gradient(135deg,#1B6B5E,#2E9B7E)}
+.swatch .dot.u{background:linear-gradient(135deg,#2A4B8C,#3D6BC8)}
+.swatch .dot.t{background:linear-gradient(135deg,#B85C3A,#C87A5A)}
+.swatch .dot.r{background:linear-gradient(135deg,#A82C2C,#C84A4A)}
+.swatch .dot.l{background:linear-gradient(135deg,#3D343A,#5D524A)}
+.swatch .dot.w{background:linear-gradient(135deg,#E8E4DF,#DCD6D0);border:1px solid #C47A2D}
+.swatch .name{font-size:11px;font-weight:600;color:#2D2623;margin-bottom:2px}
+.swatch .code{font-size:10px;color:#8B7E6B;font-family:monospace}
+.tools{padding:16px;border-top:1px solid #E8E4DF;display:flex;flex-wrap:wrap;gap:8px}
+.tool{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#FAF8F5;border:1px solid #E8E4DF;border-radius:8px;font-size:11px;color:#5D524A;cursor:pointer}
+.tool:hover{background:#FFF3D0;border-color:#C47A2D}
+.tool svg{width:16px;height:16px;stroke:currentColor;fill:none}
+.work{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:16px}
+.piece{background:#fff;border:1px solid #E8E4DF;border-radius:12px;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.piece:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(45,38,35,.1)}
+.piece .img{aspect-ratio:4/3;background:#F5F3F0;overflow:hidden;position:relative}
+.piece .img img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.piece:hover .img img{transform:scale(1.02)}
+.piece .img .stage{position:absolute;top:10px;left:10px;font-size:9px;padding:3px 8px;border-radius:999px;background:rgba(45,38,35,.9);color:#fff;font-weight:600}
+.piece .meta{padding:14px}
+.piece .title{font-size:13px;font-weight:700;color:#2D2623;margin-bottom:4px}
+.piece .meta-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.piece .chip{font-size:9.5px;padding:3px 8px;border-radius:999px;font-weight:600}
+.piece .chip.o{background:linear-gradient(90deg,#C47A2D,#D49A4A);color:#fff}
+.piece .chip.v{background:linear-gradient(90deg,#1B6B5E,#2E9B7E);color:#fff}
+.piece .chip.u{background:linear-gradient(90deg,#2A4B8C,#3D6BC8);color:#fff}
+.piece .chip.t{background:linear-gradient(90deg,#B85C3A,#C87A5A);color:#fff}
+.piece .progress{height:4px;background:#E8E4DF;border-radius:2px;overflow:hidden;margin-top:8px}
+.piece .progress i{display:block;height:100%;background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.actions{display:flex;gap:8px;padding:12px 16px;border-top:1px solid #E8E4DF}
+.btn{flex:1;padding:10px;border:0;border-radius:8px;font-weight:700;font-size:11px}
+.btn.p{background:linear-gradient(90deg,#C47A2D,#D49A4A);color:#fff}
+.btn.s{background:#FAF8F5;color:#5D524A;border:1px solid #E8E4DF}
+.cap{color:#3D2B1F;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#8B7E6B;font-weight:400;font-size:11px;margin-right:8px}
+.wrap{padding:24px;min-height:100vh}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#F5F3F0;color:#2D2623}
+*{box-sizing:border-box;margin:0;padding:0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.kpi{background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:20px;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:4px}
+.kpi:nth-child(1)::before{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.kpi:nth-child(2)::before{background:linear-gradient(90deg,#1B6B5E,#2E9B7E)}
+.kpi:nth-child(3)::before{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+.kpi:nth-child(4)::before{background:linear-gradient(90deg,#B85C3A,#C87A5A)}
+.kpi .v{font-size:30px;font-weight:800;color:#2D2623;letter-spacing:-0.5px;line-height:1}
+.kpi .u{font-size:11px;color:#8B7E6B;margin-top:4px}
+.kpi .t{font-size:11px;color:#8B7E6B;margin-top:8px;font-weight:600}
+.kpi .t::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}
+.kpi:nth-child(1) .t::before{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.kpi:nth-child(2) .t::before{background:linear-gradient(90deg,#1B6B5E,#2E9B7E)}
+.kpi:nth-child(3) .t::before{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+.kpi:nth-child(4) .t::before{background:linear-gradient(90deg,#B85C3A,#C87A5A)}
+.card{background:#fff;border:1px solid #E8E4DF;border-radius:14px;overflow:hidden}
+.card.hd{padding:14px 20px;border-bottom:1px solid #E8E4DF;display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:14px;font-weight:700;color:#2D2623}
+.card.hd .act{font-size:11px;color:#C47A2D;cursor:pointer}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="cap">ج — مرسم الفنان <span>Atelier Studio — مساحة العمل الإبداعية للمعلم والفنان</span></div>
+  <div class="grid">
+    <div class="kpi"><div class="v">٣٨</div><div class="u">طالب نشط</div><div class="t">في المرسم</div></div>
+    <div class="kpi"><div class="v">١٨</div><div class="u">عملة جارية</div><div class="t">هذا الأسبوع</div></div>
+    <div class="kpi"><div class="v">٨٧٪</div><div class="u">معدل الإنجاز</div><div class="t">+٤٪ عن الأسبوع الماضي</div></div>
+    <div class="kpi"><div class="v">٣.٢</div><div class="u">ساعات/عملة</div><div class="t">متوسط الوقت</div></div>
+  </div>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="side-hd">
+        <div class="av">أ</div>
+        <div class="tx"><b>أ. عبدالله الحربي</b><small>مشرف المرسم · فنون بصرية</small></div>
+      </div>
+      <nav class="nav">
+        <a class="on" href="#"><span>🎨</span><span>لوحة الخلط</span><span class="cnt">١٢</span></a>
+        <a href="#"><span>🖌</span><span>أدواتي</span><span class="cnt">٨</span></a>
+        <a href="#"><span>📐</span><span>مشاريعي</span><span class="cnt">٥</span></a>
+        <a href="#"><span>📚</span><span>مراجعي</span><span class="cnt">٣</span></a>
+        <a href="#"><span>📅</span><span>جدولي</span><span class="cnt">٣</span></a>
+        <a href="#"><span>⚙️</span><span>إعدادات المرسم</span></a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="canvas">
+        <div class="canvas hd"><h3>لوحة الخلط — ألواني اليوم</h3><span class="act">إضافة لون</span></div>
+        <div class="palette">
+          <div class="swatch"><div class="dot o"></div><div class="name">أصفر أوكير</div><div class="code">#C47A2D</div></div>
+          <div class="swatch"><div class="dot v"></div><div class="name">أخضر فيرidian</div><div class="code">#1B6B5E</div></div>
+          <div class="swatch"><div class="dot u"></div><div class="name">أزرق ألترا مارين</div><div class="code">#2A4B8C</div></div>
+          <div class="swatch"><div class="dot t"></div><div class="name">أحمر تيراكوتا</div><div class="code">#B85C3A</div></div>
+          <div class="swatch"><div class="dot r"></div><div class="name">أحمر كرمزي</div><div class="code">#A82C2C</div></div>
+          <div class="swatch"><div class="dot l"></div><div class="name">فحم/جرافيت</div><div class="code">#3D343A</div></div>
+          <div class="swatch"><div class="dot w"></div><div class="name">أبيض تيتانيوم</div><div class="code">#FAF8F5</div></div>
+          <div class="swatch"><div class="dot" style="background:linear-gradient(135deg,#8B7E6B,#5D524A)"></div><div class="name">بني محروق</div><div class="code">#5D524A</div></div>
+        </div>
+        <div class="tools">
+          <div class="tool"><svg viewBox="0 0 24 24"><path d="M20 100 Q50 50 100 100 Q150 150 180 100" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/></svg><span>فرشاة</span></div>
+          <div class="tool"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg><span>إسفنجة</span></div>
+          <div class="tool"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 10 10-10-10-10z"/></svg><span>سكين باليت</span></div>
+          <div class="tool"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v20M2 12h20"/></svg><span>قطارة</span></div>
+          <div class="tool"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg><span>ممحاة</span></div>
+          <div class="tool"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg><span>إضافة طبقة</span></div>
+        </div>
+      </div>
+      <div class="canvas">
+        <div class="canvas hd"><h3>أعمالي الجارية</h3><span class="act">عملة جديدة</span></div>
+        <div class="work">
+          <div class="piece"><div class="img"><span class="stage">مخطط</span></div><div class="meta"><div class="title">غروب في الوادي</div><div class="meta-row"><span class="chip o">زيت</span><span class="chip">تكويني</span></div><div class="progress"><i style="width:30%"></i></div><div class="actions"><button class="btn p">متابعة</button><button class="btn s">أرشفة</button></div></div></div>
+          <div class="piece"><div class="img"><span class="stage">قيد التنفيذ</span></div><div class="meta"><div class="title">انعكاسات الصباح</div><div class="meta-row"><span class="chip v">مائي</span><span class="chip">مرحلي</span></div><div class="progress"><i style="width:65%"></i></div><div class="actions"><button class="btn p">متابعة</button><button class="btn s">تصوير</button></div></div></div>
+          <div class="piece"><div class="img"><span class="stage">مراجعة</span></div><div class="meta"><div class="title">مدينة المستقبل</div><div class="meta-row"><span class="chip u">رقمي</span><span class="chip">ختامي</span></div><div class="progress"><i style="width:90%"></i></div><div class="actions"><button class="btn p">إرسال للمراجعة</button><button class="btn s">تصدير</button></div></div></div>
+          <div class="piece"><div class="img"><span class="stage">مكتمل</span></div><div class="meta"><div class="title">أحلام اليقظة</div><div class="meta-row"><span class="chip t">أكريليك</span><span class="chip">ختامي</span></div><div class="progress"><i style="width:100%"></i></div><div class="actions"><button class="btn p">نشر في المعرض</button><button class="btn s">أرشفة</button></div></div></div>
+          <div class="piece"><div class="img"><span class="stage">مخطط</span></div><div class="meta"><div class="title">وجوه من الذاكرة</div><div class="meta-row"><span class="chip o">فحم</span><span class="chip">تكويني</span></div><div class="progress"><i style="width:15%"></i></div><div class="actions"><button class="btn p">بدء</button><button class="btn s">حذف</button></div></div></div>
+          <div class="piece"><div class="img"><span class="stage">قيد التنفيذ</span></div><div class="meta"><div class="title">قصص من التراث</div><div class="meta-row"><span class="chip v">كولاج</span><span class="chip">مرحلي</span></div><div class="progress"><i style="width:45%"></i></div><div class="actions"><button class="btn p">متابعة</button><button class="btn s">مشاركة</button></div></div></div>
+        </div>
+      </div>
+      <div class="canvas">
+        <div class="canvas hd"><h3>مراجعي وملهماتي</h3><span class="act">إضافة</span></div>
+        <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+          <div style="background:#fff;border:1px solid #E8E4DF;border-radius:12px;padding:14px;text-align:center"><div style="font-weight:700;margin-bottom:4px">كتاب: اللون في الفن</div><small style="color:#8B7E6B">جون جيج · ٣٢٠ ص</small></div>
+          <div style="background:#fff;border:1px solid #E8E4DF;border-radius:12px;padding:14px;text-align:center"><div style="font-weight:700;margin-bottom:4px">فنان: مونيه</div><small style="color:#8B7E6B">انطباعي · ١٨٤٠-١٩٢٦</small></div>
+          <div style="background:#fff;border:1px solid #E8E4DF;border-radius:12px;padding:14px;text-align:center"><div style="font-weight:700;margin-bottom:4px">تقنية: الجلازينج</div><small style="color:#8B7E6B">طبقة شفافة فوق جافة</small></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body></html>

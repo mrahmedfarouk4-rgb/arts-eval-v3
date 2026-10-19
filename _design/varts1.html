@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>أ — استوديو الألوان — Color Studio Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#FAF8F5;color:#1D1A17}
+.wrap{padding:24px;min-height:100vh}
+.cap{color:#3D2B1F;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#8B7E6B;font-weight:400;font-size:11px;margin-right:8px}
+
+/* ── ألوان اللوحة ── */
+:root{
+  --canvas:#FAF8F5; --paper:#FFFFFF;
+  --charcoal:#2D2623; --charcoal2:#3D3430;
+  --ochre:#C47A2D; --ochre2:#D49A4A; --ochre3:#E8C56D;
+  --terracotta:#B85C3A; --terracotta2:#C87A5A;
+  --ultramarine:#2A4B8C; --ultramarine2:#3D6BC8;
+  --viridian:#1B6B5E; --viridian2:#2E9B7E;
+  --crimson:#A82C2C; --crimson2:#C84A4A;
+  --titanium:#F5F3F0; --titanium2:#EDEAE6;
+  --graphite:#3D3430; --graphite2:#5D524A;
+  --line:#E8E4DF; --line2:#DCD6D0;
+  --shadow:rgba(45,38,35,.08);
+}
+
+/* ── قاعدة ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:var(--canvas);color:var(--charcoal)}
+.wrap{display:flex;gap:24px;padding:24px;align-items:flex-start;min-height:100vh}
+.col{display:flex;flex-direction:column;gap:16px}
+.cap{color:#3D2B1F;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#8B7E6B;font-weight:400;font-size:11px;margin-right:8px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.kpi{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:var(--accent)}
+.kpi:nth-child(1)::before{background:linear-gradient(90deg,var(--ochre),var(--ochre2))}
+.kpi:nth-child(2)::before{background:linear-gradient(90deg,var(--viridian),var(--viridian2))}
+.kpi:nth-child(3)::before{background:linear-gradient(90deg,var(--ultramarine),var(--ultramarine2))}
+.kpi:nth-child(4)::before{background:linear-gradient(90deg,var(--terracotta),var(--terracotta2))}
+.kpi .v{font-size:30px;font-weight:800;color:var(--charcoal);letter-spacing:-0.5px;line-height:1}
+.kpi .u{font-size:11px;color:#8B7E6B;margin-top:4px}
+.kpi .t{font-size:11px;color:#8B7E6B;margin-top:8px;font-weight:600}
+.kpi .t::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-left:6px}
+.kpi:nth-child(1) .t::before{background:var(--ochre)}
+.kpi:nth-child(2) .t::before{background:var(--viridian)}
+.kpi:nth-child(3) .t::before{background:var(--ultramarine)}
+.kpi:nth-child(4) .t::before{background:var(--terracotta)}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.card.hd{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:14px;font-weight:700;color:#2D2623}
+.card.hd .act{font-size:11px;color:#C47A2D;cursor:pointer}
+
+/* ── خريطة حرارية بألوان الأصباغ ── */
+.heat{padding:16px}
+.hrow{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.hrow .lbl{width:180px;font-size:12px;color:#3D2B1F}
+.hrow .bar{flex:1;height:30px;background:var(--titanium);border-radius:6px;overflow:hidden;position:relative;border:1px solid var(--line2)}
+.hrow .bar i{display:block;height:100%;border-radius:5px}
+.hrow .bar i.o{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.hrow .bar i.v{background:linear-gradient(90deg,#1B6B5E,#2E9B7E)}
+.hrow .bar i.u{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+.hrow .bar i.t{background:linear-gradient(90deg,#B85C3A,#C87A5A)}
+.hrow .bar i.c{background:linear-gradient(90deg,#A82C2C,#C84A4A)}
+.hrow .bar i.l{background:linear-gradient(90deg,#3D343A,#5D524A)}
+.hrow .val{width:55px;font-size:11px;color:#8B7E6B;text-align:left}
+.hrow .swatch{width:28px;height:28px;border-radius:6px;border:1px solid var(--line2);flex:none}
+
+/* ── تنبيهات ── */
+.alerts{padding:16px;background:#FFF8F0;border-top:1px solid var(--line)}
+.alert{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #F5E8D0}
+.alert:last-child{border:0}
+.alert .ic{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
+.alert.w .ic{background:#FFF3D0;color:#B87A2A}
+.alert.i .ic{background:#E0F5F0;color:#1B6B5E}
+.alert.c .ic{background:#FDE8E8;color:#A82C2C}
+.alert .tx{flex:1;font-size:12px;line-height:1.6}
+.alert .tx b{color:#2D2623}
+.alert .tx .meta{color:#8B7E6B;font-size:10.5px;margin-top:2px;display:block}
+
+/* ── فرشاة ── */
+.brush{position:fixed;bottom:30px;left:30px;width:120px;height:120px;opacity:.04;pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M20 100 Q50 50 100 100 Q150 150 180 100' stroke='%23C47A2D' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;z-index:0;opacity:.03}
+</style></head>
+<body>
+<div class="brush"></div>
+<div class="wrap">
+  <div class="cap">أ — استوديو الألوان <span>Color Studio Dashboard — لوحة الرؤى بلغة الأصباغ</span></div>
+  <div class="grid">
+    <div class="kpi" style="--accent:#C47A2D"><div class="v">٢٣٤</div><div class="u">طالب نشط</div><div class="t">هذا الأسبوع</div></div>
+    <div class="kpi" style="--accent:#1B6B5E"><div class="v">٨٧٪</div><div class="u">نسبة الإنجاز</div><div class="t">+٤٪ عن الأسبوع الماضي</div></div>
+    <div class="kpi" style="--accent:#2A4B8C"><div class="v">١٢</div><div class="u">معلم نشط</div><div class="t">٣ معلمين غابوا</div></div>
+    <div class="kpi" style="--accent:#B85C3A"><div class="v">٣.٢</div><div class="u">أسبوع/تقييم</div><div class="t">الحد الأدنى ٢.٥</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card" style="height:380px">
+      <div class="card hd"><h3>خريطة الأصباغ: الإنجاز × المرحلة × النوع</h3><span class="act">تصدير PNG</span></div>
+      <div class="heat">
+        <div class="hrow"><span class="lbl">المتوسطة · تكويني</span><div class="bar"><i style="width:87%;background:linear-gradient(90deg,#C47A2D,#D49A4A)"></i></div><span class="val">٨٧٪</span><div class="swatch" style="background:linear-gradient(90deg,#C47A2D,#D49A4A)"></div></div>
+        <div class="hrow"><span class="lbl">المتوسطة · مرحلي</span><div class="bar"><i style="width:76%;background:linear-gradient(90deg,#1B6B5E,#2E9B7E)"></i></div><span class="val">٧٦٪</span><div class="swatch" style="background:linear-gradient(90deg,#1B6B5E,#2E9B7E)"></div></div>
+        <div class="hrow"><span class="lbl">المتوسطة · ختامي</span><div class="bar"><i style="width:68%;background:linear-gradient(90deg,#2A4B8C,#3D6BC8)"></i></div><span class="val">٦٨٪</span><div class="swatch" style="background:linear-gradient(90deg,#2A4B8C,#3D6BC8)"></div></div>
+        <div class="hrow"><span class="lbl">الابتدائية · تكويني</span><div class="bar"><i style="width:82%;background:linear-gradient(90deg,#B85C3A,#C87A5A)"></i></div><span class="val">٨٢٪</span><div class="swatch" style="background:linear-gradient(90deg,#B85C3A,#C87A5A)"></div></div>
+        <div class="hrow"><span class="lbl">الابتدائية · مرحلي</span><div class="bar"><i style="width:71%;background:linear-gradient(90deg,#A82C2C,#C84A4A)"></i></div><span class="val">٧١٪</span><div class="swatch" style="background:linear-gradient(90deg,#A82C2C,#C84A4A)"></div></div>
+        <div class="hrow"><span class="lbl">الابتدائية · ختامي</span><div class="bar"><i style="width:59%;background:linear-gradient(90deg,#3D343A,#5D524A)"></i></div><span class="val">٥٩٪</span><div class="swatch" style="background:linear-gradient(90deg,#3D343A,#5D524A)"></div></div>
+      </div>
+    </div>
+    <div class="card" style="height:380px">
+      <div class="card hd"><h3>لوحة الخلط: أفضل/أسوأ ٥</h3></div>
+      <div style="padding:16px">
+        <div style="margin-bottom:14px"><b style="color:#1B6B5E">أعلى إنجاز</b></div>
+        <div style="font-size:12px;margin:4px 0"><b>ريم العتيبي</b> · المتوسطة · ٩٨٪ <span style="color:#1B6B5E">●●●●●</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>سلمان الحربي</b> · المتوسطة · ٩٦٪ <span style="color:#1B6B5E">●●●●○</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>فهد الشمري</b> · المتوسطة · ٩٤٪ <span style="color:#1B6B5E">●●●○○</span></div>
+        <div style="margin-top:14px"><b style="color:#A82C2C">أدنى إنجاز</b></div>
+        <div style="font-size:12px;margin:4px 0"><b>نورة القحطاني</b> · الابتدائية · ٥٤٪ <span style="color:#A82C2C">●○○○○</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>ماجد الشمري</b> · المتوسطة · ٥٧٪ <span style="color:#A82C2C">●○○○○</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>هند العتيبي</b> · المتوسطة · ٦١٪ <span style="color:#A82C2C">●●○○○</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card hd"><h3>تنبيهات الاستوديو</h3></div>
+    <div class="alerts" style="padding:16px;background:#FFF8F0;border-top:1px solid #E8E4DF">
+      <div class="alert w" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #F5E8D0"><div class="ic" style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none;background:#FFF3D0;color:#B87A2A">⚠</div><div class="tx"><b>٣ معلمين</b> لم يسجلوا تقييمات منذ ٧ أيام<div class="meta" style="color:#8B7E6B;font-size:10.5px;margin-top:2px">مهلة SLA: ٣ أيام متبقية</div></div></div>
+      <div class="alert i" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #F5E8D0"><div class="ic" style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none;background:#E0F5F0;color:#1B6B5E">ℹ</div><div class="tx"><b>١٢ طالباً</b> دون التقييم التكويني للوحدة الحالية<div class="meta" style="color:#8B7E6B;font-size:10.5px;margin-top:2px">الموعد النهائي: بعد ٣ أيام</div></div></div>
+      <div class="alert c" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0"><div class="ic" style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none;background:#FDE8E8;color:#A82C2C">⚠</div><div class="tx"><b>اتجاه تنازلي</b> في «الألوان المائية» للأسبوع الثالث<div class="meta" style="color:#8B7E6B;font-size:10.5px;margin-top:2px">انخفاض ٨٪ عن المتوسط</div></div></div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>تصميم ج — الاستمارة</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#EDE9E2}
+.wrap{display:flex;gap:22px;padding:22px;align-items:flex-start;min-height:100vh}
+.col{display:flex;flex-direction:column;gap:9px}
+.cap{color:#15202B;font-size:12.5px;font-weight:700}
+.cap span{color:#8A7F6E;font-weight:400;font-size:11px;margin-right:8px}
+.phone{width:366px;height:800px;border-radius:30px;overflow:hidden;background:#FCFCFA;
+  box-shadow:0 26px 60px rgba(60,45,30,.25);display:flex;flex-direction:column;color:#15202B}
+.prog{height:3px;background:#E8E4DC;flex:none}
+.prog i{display:block;height:100%}
+.head{padding:16px 24px 2px;display:flex;font-size:11px;color:#A99E8B}
+.head b{color:#7A7267;letter-spacing:.3px}
+.head span{margin-right:auto}
+.q{padding:14px 24px 4px}
+.q h2{font-size:27px;font-weight:700;line-height:1.3;letter-spacing:-.3px}
+.q p{font-size:13px;color:#7A7267;margin-top:8px;line-height:1.65}
+.rows{padding:4px 24px 0}
+.row{display:flex;align-items:center;gap:14px;padding:17px 2px;border-bottom:1px solid #EAE5DC}
+.row .ix{font-size:12px;color:#C0B6A4;width:18px;font-variant-numeric:tabular-nums}
+.row .tx{flex:1}
+.row .tx b{font-size:16.5px;font-weight:600;display:block}
+.row .tx small{font-size:11.5px;color:#8A7F6E;display:block;margin-top:2px}
+.row .go{color:#C0B6A4;font-size:18px}
+.row.on{background:#FAF5EC;border-radius:13px;padding:17px 14px;border-bottom-color:transparent}
+.row.on .ix{color:#621244;font-weight:700}
+.row.on .tx b{color:#621244}
+.row.on .tx small{color:#8A6A72}
+.row.on .go{color:#621244}
+.key{margin:16px 24px 0;padding:13px 15px;border-radius:12px;background:#F4F1EA;
+  font-size:11.5px;color:#7A7267;line-height:1.75}
+.key b{color:#621244}
+.act{padding:18px 24px 22px;margin-top:auto}
+.btn{width:100%;padding:17px;border:0;border-radius:14px;background:#621244;color:#fff;
+  font-size:16px;font-weight:700;font-family:inherit}
+.btn.sec{background:transparent;color:#A99E8B;font-size:13px;padding:12px;margin-top:9px;font-weight:500}
+.big{font-size:46px;font-weight:800;letter-spacing:-1px;line-height:1;color:#621244}
+.sub{font-size:11.5px;color:#8A7F6E;margin-top:5px}
+.tally{display:flex;gap:5px;margin-top:14px}
+.tally i{flex:1;height:6px;border-radius:3px;background:#E8E4DC}
+.tally i.on{background:#621244}
+</style></head>
+<body>
+<div class="wrap">
+
+  <div class="col">
+    <div class="cap">٣ · الاستمارة <span>الخطوة ٢ — عمود واحد (Typeform / Airtable)</span></div>
+    <div class="phone">
+      <div class="prog"><i style="width:50%;background:#621244"></i></div>
+      <div class="head"><b>الخطوة ٢ من ٤</b><span>أنصت · أ. أحمد فاروق</span></div>
+      <div class="q">
+        <h2>أيّ مقرر تُقيِّم الآن؟</h2>
+        <p>لن ترى إلا مقرراتك المسندة — إدارة المعلمين في الإعدادات.</p>
+      </div>
+      <div class="rows">
+        <div class="row on"><span class="ix">١</span><div class="tx"><b>أساسيات الرسم</b><small>٣ أنواع تقييم · ١٦ بنداً</small></div><span class="go">‹</span></div>
+        <div class="row"><span class="ix">٢</span><div class="tx"><b>الرسم الكرتوني</b><small>٣ أنواع تقييم · ١٦ بنداً</small></div><span class="go">‹</span></div>
+        <div class="row"><span class="ix">٣</span><div class="tx"><b>الألوان المائية</b><small>٣ أنواع تقييم · ١٦ بنداً</small></div><span class="go">‹</span></div>
+        <div class="row"><span class="ix">٤</span><div class="tx"><b>الرسم الرقمي</b><small>٣ أنواع تقييم · ١٦ بنداً</small></div><span class="go">‹</span></div>
+      </div>
+      <div class="key">٣ مقررات أخرى في هذه المرحلة غير مسندة إليك.<br>
+        إن كنت تحتاجها <b>راجع المشرف</b>.</div>
+      <div class="act"><button class="btn">متابعة ←</button><button class="btn sec">رجوع</button></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="cap">الخطوة ٤ · الرصد <span>الاستمارة نفسها — نفس النمط</span></div>
+    <div class="phone">
+      <div class="prog"><i style="width:100%;background:#C03944"></i></div>
+      <div class="head"><b>الخطوة ٤ من ٤</b><span>سلمان · أساسيات الرسم</span></div>
+      <div class="q">
+        <h2>الوحدة الثانية — كم مجموع الطالب؟</h2>
+        <p>١٦ بنداً على أربعة مستويات. المجموع من ٢٠.</p>
+      </div>
+      <div style="padding:6px 24px 0">
+        <div class="big">١٨</div>
+        <div class="sub">من ٢٠ درجة · «يتخطى الهدف»</div>
+        <div class="tally"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+      </div>
+      <div class="rows" style="margin-top:14px">
+        <div class="row on"><span class="ix">✓</span><div class="tx"><b>يرسم الأشكال بوضوح</b><small>١٦ بنداً · المستوى ٤</small></div><span class="go">✓</span></div>
+        <div class="row"><span class="ix">✓</span><div class="tx"><b>يستخدم_lines الإرشادية</b><small>المستوى ٤</small></div><span class="go">✓</span></div>
+        <div class="row"><span class="ix">•</span><div class="tx"><b>ينظّم الألوان والظلال</b><small>المستوى ٣</small></div><span class="go">✓</span></div>
+      </div>
+      <div class="act"><button class="btn">احفظ واطبع</button><button class="btn sec">رجوع</button></div>
+    </div>
+  </div>
+
+</div>
+</body></html>

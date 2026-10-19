@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>٢ · البطاقة الذكية — Spatial Canvas</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#1A1F2E;color:#E4E7EC}
+.wrap{padding:24px;min-height:100vh}
+.canvas{width:100%;height:90vh;background:#0F1115;border-radius:20px;
+  box-shadow:0 40px 80px rgba(0,0,0,.6);overflow:hidden;position:relative}
+.cap{color:#FBE122;font-size:13px;font-weight:700;margin-bottom:8px}
+.cap span{color:#7C8794;font-weight:400;font-size:11px;margin-right:8px}
+.toolbar{display:flex;gap:8px;padding:10px 14px;background:#171A21;border-bottom:1px solid #232833}
+.tbtn{padding:8px 14px;border-radius:8px;background:#1F2430;border:1px solid #2A2F3A;
+  color:#C6CDD8;font-size:11px;cursor:pointer}
+.tbtn.on{background:#FBE122;border-color:#FBE122;color:#0F1115}
+.tbtn:disabled{opacity:.4;cursor:not-allowed}
+.zoom{margin-right:auto;font-size:11px;color:#98A2B3}
+.card{position:absolute;background:#171A21;border:1px solid #232833;border-radius:12px;
+  padding:10px;min-width:200px;max-width:260px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+  transition:transform .15s,box-shadow .15s;cursor:grab}
+.card:hover{box-shadow:0 16px 40px rgba(0,0,0,.5);transform:translateY(-2px)}
+.card.dragging{opacity:.9;box-shadow:0 24px 60px rgba(251,225,34,.3);z-index:100}
+.card.selected{border-color:#FBE122;box-shadow:0 0 0 2px #FBE122,0 16px 40px rgba(0,0,0,.5)}
+.card .head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.avatar{width:32px;height:32px;border-radius:50%;background:conic-gradient(from 0deg,#FBE122,#1B7A42,#007886,#9056A1,#FBE122);
+  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#0F1115}
+.card h4{font-size:12px;font-weight:700;flex:1}
+.badge{font-size:9px;padding:2px 6px;border-radius:999px;background:#1F2430;color:#C6CDD8}
+.badge.on{background:#FBE122;color:#0F1115;font-weight:700}
+.meta{font-size:10px;color:#98A2B3;margin:6px 0}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.row b{flex:1;font-size:11px}
+.row small{color:#7C8794;font-size:10px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.chip{font-size:9px;padding:3px 8px;border-radius:999px;background:#1F2430;color:#C6CDD8}
+.chip.on{background:#FBE122;color:#0F1115;font-weight:700}
+.zone{position:absolute;background:rgba(251,225,34,.08);border:2px dashed #FBE122;
+  border-radius:16px;display:flex;align-items:center;justify-content:center;color:#FBE122;
+  font-size:13px;font-weight:700;pointer-events:none;opacity:0;transition:opacity .2s}
+.zone.active{opacity:1}
+.zone-label{padding:24px;text-align:center}
+.sidebar{position:absolute;top:50px;right:14px;width:220px;background:#171A21;border:1px solid #232833;
+  border-radius:12px;padding:12px;z-index:20}
+.sidebar h5{font-size:11px;color:#FBE122;margin-bottom:10px}
+.filter{display:flex;flex-direction:column;gap:6px}
+.fltr{display:flex;align-items:center;gap:8px;font-size:11px;color:#C6CDD8;cursor:pointer}
+.fltr input{width:14px;height:14px;accent-color:#FBE122}
+.legend{margin-top:14px;padding-top:10px;border-top:1px solid #232833}
+.legend div{display:flex;align-items:center;gap:6px;font-size:10px;color:#98A2B3;margin:4px 0}
+.legend b{width:10px;height:10px;border-radius:3px}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="cap">٢ · البطاقة الذكية <span>Spatial Canvas — لوح لا نهائي، اسحب وأفلت</span></div>
+  <div class="canvas" id="canvas">
+    <div class="toolbar">
+      <div class="tbtn on" data-tool="select">✦ تحديد</div>
+      <div class="tbtn" data-tool="rectangle">⬜ تجميع</div>
+      <div class="tbtn" data-tool="lasso">🔗 ربط</div>
+      <div class="tbtn" data-tool="note">📝 ملاحظة</div>
+      <span class="zoom">تكبير: <b id="zoom">١٠٠٪</b></span>
+    </div>
+    <div class="sidebar">
+      <h5>المرشحات</h5>
+      <div class="filter">
+        <label class="fltr"><input type="checkbox" checked> أساسيات الرسم</label>
+        <label class="fltr"><input type="checkbox" checked> الرسم الكرتوني</label>
+        <label class="fltr"><input type="checkbox" checked> الألوان المائية</label>
+        <label class="fltr"><input type="checkbox" checked> الرسم الرقمي</label>
+      </div>
+      <div class="legend">
+        <div><b style="background:#007886"></b> تكويني</div>
+        <div><b style="background:#1B7A42"></b> مرحلي</div>
+        <div><b style="background:#9056A1"></b> ختامي</div>
+        <div><b style="background:#FBE122"></b> تم</div>
+      </div>
+    </div>
+
+    <!-- مناطق الإسقاط -->
+    <div class="zone" id="z1" style="top:120px;left:50px;width:220px;height:140px">
+      <span class="zone-label">أفلت هنا → <b>تكويني</b></span>
+    </div>
+    <div class="zone" id="z2" style="top:120px;left:300px;width:220px;height:140px">
+      <span class="zone-label">أفلت هنا → <b>مرحلي</b></span>
+    </div>
+    <div class="zone" id="z3" style="top:120px;left:550px;width:220px;height:140px">
+      <span class="zone-label">أفلت هنا → <b>ختامي</b></span>
+    </div>
+
+    <!-- بطاقات طلاب -->
+    <div class="card" id="c1" style="top:220px;left:60px" data-subject="drawing_basics">
+      <div class="head"><div class="avatar">س</div><h4>سلمان الحربي</h4><span class="badge on">نشط</span></div>
+      <div class="meta">الصف الثاني متوسط · ف١</div>
+      <div class="row"><b>أساسيات الرسم</b><span class="chip on">تكويني</span></div>
+      <div class="row"><b>الرسم الكرتوني</b><span class="chip">مرحلي</span></div>
+      <div class="row"><b>الألوان المائية</b><span class="chip">ختامي</span></div>
+    </div>
+    <div class="card" id="c2" style="top:220px;left:360px" data-subject="cartoon">
+      <div class="head"><div class="avatar">ر</div><h4>ريم العتيبي</h4><span class="badge on">نشط</span></div>
+      <div class="meta">الصف الأول متوسط · ف٢</div>
+      <div class="row"><b>الرسم الكرتوني</b><span class="chip on">مرحلي</span></div>
+      <div class="row"><b>الألوان المائية</b><span class="chip">ختامي</span></div>
+    </div>
+    <div class="card" id="c3" style="top:220px;left:660px" data-subject="watercolor">
+      <div class="head"><div class="avatar">ف</div><h4>فهد الشمري</h4><span class="badge">غائب</span></div>
+      <div class="meta">الصف الثاني متوسط · ف١</div>
+      <div class="row"><b>أساسيات الرسم</b><span class="chip on">تكويني</span></div>
+      <div class="row"><b>الألوان المائية</b><span class="chip on">ختامي</span></div>
+    </div>
+    <div class="card" id="c4" style="top:420px;left:60px" data-subject="digital_drawing">
+      <div class="head"><div class="avatar">ن</div><h4>نورة القحطاني</h4><span class="badge on">نشط</span></div>
+      <div class="meta">الصف الأول متوسط · ف١</div>
+      <div class="row"><b>الرسم الرقمي</b><span class="chip on">تكويني</span></div>
+      <div class="row"><b>أساسيات الرسم</b><span class="chip">ختامي</span></div>
+    </div>
+    <div class="card" id="c5" id="c5" style="top:420px;left:360px" data-subject="character_design">
+      <div class="head"><div class="avatar">م</div><h4>ماجد الشمري</h4><span class="badge on">نشط</span></div>
+      <div class="meta">الصف الثاني متوسط · ف٢</div>
+      <div class="row"><b>تصميم الشخصيات</b><span class="chip on">تكويني</span></div>
+      <div class="row"><b>الرسم الرقمي</b><span class="chip">مرحلي</span></div>
+    </div>
+    <div class="card" id="c6" style="top:420px;left:660px" data-subject="saudi_arts">
+      <div class="head"><div class="avatar">ه</div><h4>هند العتيبي</h4><span class="badge on">نشط</span></div>
+      <div class="meta">الصف الثاني متوسط · ف٢</div>
+      <div class="row"><b>الفنون السعودية</b><span class="chip on">مرحلي</span></div>
+      <div class="row"><b>الأشغال اليدوية</b><span class="chip">ختامي</span></div>
+    </div>
+  </div>
+  <script>
+  const canvas=document.getElementById('canvas');
+  const cards=document.querySelectorAll('.card');
+  const zones=[document.getElementById('z1'),document.getElementById('z2'),document.getElementById('z3')];
+  let drag=null, offsetX=0, offsetY=0, scale=1;
+
+  cards.forEach(c=>{
+    c.addEventListener('mousedown', e=>{
+      if(e.target.closest('.tbtn')) return;
+      drag=c; c.classList.add('dragging');
+      const r=c.getBoundingClientRect(); const cv=canvas.getBoundingClientRect();
+      offsetX=e.clientX-r.left; offsetY=e.clientY-r.top;
+      c.style.zIndex=100; document.body.style.cursor='grabbing';
+    });
+  });
+  document.addEventListener('mousemove', e=>{
+    if(!drag) return;
+    const cv=canvas.getBoundingClientRect();
+    const x=e.clientX-cv.left-offsetX, y=e.clientY-cv.top-offsetY;
+    drag.style.left=x+'px'; drag.style.top=y+'px';
+    zones.forEach(z=>{ const r=z.getBoundingClientRect(), cr=drag.getBoundingClientRect();
+      const hit=!(cr.right<r.left||cr.left>r.right||cr.bottom<r.top||cr.top>r.bottom);
+      z.classList.toggle('active',hit);
+    });
+  });
+  document.addEventListener('mouseup', ()=>{
+    if(!drag) return;
+    zones.forEach(z=>{ z.classList.remove('active');
+      const r=z.getBoundingClientRect(), cr=drag.getBoundingClientRect();
+      if(!(cr.right<r.left||cr.left>r.right||cr.bottom<r.top||cr.top>r.bottom)){
+        const t=z.id==='z1'?'تكويني':z.id==='z2'?'مرحلي':'ختامي';
+        alert('تم إسناد ' + drag.querySelector('h4').innerText + ' إلى ' + t);
+      }
+    });
+    drag.classList.remove('dragging'); drag.style.zIndex=''; document.body.style.cursor='';
+    drag=null;
+  });
+
+  // اختيار متعدد
+  document.addEventListener('click', e=>{
+    const c=e.target.closest('.card');
+    if(c && !e.target.closest('.tbtn')){
+      if(e.shiftKey) c.classList.toggle('selected');
+      else { document.querySelectorAll('.card').forEach(x=>x!==c&&x.classList.remove('selected')); c.classList.add('selected'); }
+    }
+  });
+
+  // تكبير/تصغير
+  let scale=1; canvas.addEventListener('wheel', e=>{ if(e.ctrlKey){ e.preventDefault(); scale=Math.max(.5,Math.min(2,scale-e.deltaY*.001)); canvas.style.transform=`scale(${scale})`; document.getElementById('zoom').innerText=Math.round(scale*100)+'٪'; }},{passive:false});
+
+  // أدوات الشريط
+  document.querySelectorAll('.tbtn').forEach(b=>{ b.onclick=()=>{ document.querySelectorAll('.tbtn').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }});
+  </script>
+</body></html>

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>استمارة التقييم — بوابة تقييم الفنون البصرية</title>
+<style>
+  /* ---------------------------------------------------------------
+     الخط الرسمي: «سكال مجلّة» (Sakkal Majalla) — خط استمارات وزارة
+     الثقافة. مضمّن Base64 لأن جهاز Android لا يحويه، فنضمن أن
+     تُطبع الورقة من الجوال بنفس شكلها من الحاسوب.
+     الأحجام والألوان مقيسة من ملف الـ PDF الرسمي:
+       العنوان 14pt عريض · لون ‎#0F4761
+       سطر المسار 14pt عريض · لون ‎#6E1946
+       حقول الطالب 12pt · أسود
+     --------------------------------------------------------------- */
+  @font-face {
+    font-family: 'Sakkal Majalla';
+    src: url(data:font/ttf;base64,AAEAAAASAQAABAAgR0RFRgMjA2YAAHuIAAAANEdQT1M6FxW3AAB7vAAADSBHU1VClNJ3PwAAiNwAAADET1MvMpEh6RAAAAGoAAAA) format('truetype');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Sakkal Majalla';
+    src: url(data:font/ttf;base64,AAEAAAASAQAABAAgR0RFRgMlA2gAAHysAAAANEdQT1MmhDR+AAB84AAADTZHU1VClNJ3PwAAihgAAADET1MvMpJN6Q8AAAGoAAAA) format('truetype');
+    font-weight: 700;
+    font-style: normal;
+  }
+
+  /* A4 بلا هوامش — الصفحة هي الكليشة نفسها */
+  @page { size: A4 portrait; margin: 0; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #eef1f2; }
+
+  body {
+    font-family: 'Sakkal Majalla', 'Calibri', 'Noto Naskh Arabic',
+                 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+    direction: rtl;
+    color: #1a1a1a;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    padding: 11mm 12mm 8mm 14mm;   /* يسار أعرض لتفادي حافة الطباعة */
+    margin: 0 auto 8mm auto;
+    background: #ffffff;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+    display: flex;
+    flex-direction: column;
+  }
+  .print-page:last-child { page-break-after: auto; break-after: auto; }
+
+  /* الشريط الزخرفي — مربعات الألوان على حافة الصفحة اليسرى.
+     الأبعاد من الكليشة الرسمية نفسها، ومرسوم مستطيلات لا صورة:
+     يبقى كل حدّ حاداً مهما صغّره الطابع. */
+  .page-ribbon {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: 4.99mm;
+    height: 98.55mm;
+    display: flex;
+    flex-direction: column;
+    /* ⚠ الصفحة كلها rtl، وflex-start في RTL ينحاذ إلى اليمين —
+       فتصطف القطع من اليمين فتصير حافتها المستوية إلى الداخل.
+       ltr هنا هو ما يجعل الحافة المستوية ملاصقة لحافة الصفحة، كما في الأصل. */
+    direction: ltr;
+    align-items: flex-start;
+  }
+  .page-ribbon i {
+    display: block;
+    min-height: 0;
+  }
+  .page-ribbon i.gap {
+    width: 0;
+    background: none;
+  }
+
+  /* شعار الوزارة أعلى اليمين */
+  .moc-logo {
+    position: absolute;
+    top: 7mm;
+    right: 11mm;
+    height: 24mm;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .sheet-title {
+    margin: 19mm 0 0 0;
+    text-align: center;
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0F4761;
+    line-height: 1.45;
+  }
+
+  /* بيانات الطالب — عمودان كما في الكليشة.
+     اتجاه الصفحة rtl يجعل أول عمود على اليمين، فنضع فيه المعلم والتاريخ. */
+  .sheet-fields {
+    margin-top: 5mm;
+    margin-bottom: 9mm;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 10mm;
+    padding-right: 2mm;
+  }
+  .field-col { flex: 1; }
+
+  table { page-break-inside: avoid; border-collapse: collapse; }
+  tr    { page-break-inside: avoid; }
+  th    { page-break-inside: avoid; }
+  td    { page-break-inside: avoid; }
+
+  /* التذييل — ثلاثة أعمدة كما في الكليشة: إنجليزي يسار · هاتف وسط · عربي يمين.
+     اللون والحجم مقيسان من «أساسيات الرسم وحدة 1 - مفرغ» (الورقة الرسمية). */
+  .sheet-foot {
+    margin-top: auto;
+    direction: ltr;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: start;
+    column-gap: 4mm;
+    padding: 3mm 3mm 0 3mm;
+    font-family: Arial, 'Segoe UI', Tahoma, sans-serif;
+    font-size: 6.6pt;
+    line-height: 1.45;
+    color: #0F2837;
+  }
+  .sheet-foot b { font-weight: 700; }
+
+  .foot-en   { text-align: left;  direction: ltr; grid-column: 1; justify-self: start; }
+  .foot-mid  { text-align: center; direction: ltr; grid-column: 2; justify-self: center; }
+  .foot-ar   { text-align: right;  direction: rtl; grid-column: 3; justify-self: end; }
+
+
+  @media print {
+    .print-page { margin: 0 !important; box-shadow: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="print-page">
+  <!-- الشريط الزخرفي — مربعات ألوان الوزارة على يسار الصفحة -->
+  <div class="page-ribbon" aria-hidden="true"><i style="flex:24 0 0;width:4.74mm;background:#91B9B4"></i><i style="flex:6 0 0;width:4.99mm;background:#3F1231"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:18 0 0;width:4.99mm;background:#6E1946"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:4 0 0;width:4.82mm;background:#E64524"></i><i class="gap" style="flex:18 0 0"></i><i style="flex:107 0 0;width:4.57mm;background:#EB5A3C"></i><i class="gap" style="flex:1 0 0"></i><i style="flex:10 0 0;width:4.99mm;background:#FF9619"></i><i class="gap" style="flex:14 0 0"></i><i style="flex:7 0 0;width:4.66mm;background:#B41932"></i><i class="gap" style="flex:9 0 0"></i><i style="flex:56 0 0;width:4.99mm;background:#0F2837"></i><i class="gap" style="flex:15 0 0"></i><i style="flex:16 0 0;width:4.57mm;background:#FAC39B"></i><i class="gap" style="flex:3 0 0"></i><i style="flex:30 0 0;width:4.66mm;background:#B41932"></i><i class="gap" style="flex:3 0 0"></i><i style="flex:4 0 0;width:4.74mm;background:#6E1946"></i><i class="gap" style="flex:8 0 0"></i><i style="flex:102 0 0;width:4.66mm;background:#FF9619"></i><i class="gap" style="flex:22 0 0"></i><i style="flex:6 0 0;width:4.57mm;background:#FAC39B"></i><i class="gap" style="flex:18 0 0"></i><i style="flex:5 0 0;width:4.74mm;background:#8E8D6D"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:4 0 0;width:4.74mm;background:#91B9B4"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:43 0 0;width:4.99mm;background:#EB5A3C"></i><i class="gap" style="flex:14 0 0"></i><i style="flex:9 0 0;width:4.99mm;background:#EB3506"></i><i class="gap" style="flex:1 0 0"></i><i style="flex:18 0 0;width:4.91mm;background:#FF9619"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:26 0 0;width:4.74mm;background:#6E1946"></i><i class="gap" style="flex:19 0 0"></i><i style="flex:107 0 0;width:4.91mm;background:#FAC39B"></i><i class="gap" style="flex:16 0 0"></i><i style="flex:7 0 0;width:4.74mm;background:#0F2837"></i><i class="gap" style="flex:16 0 0"></i><i style="flex:6 0 0;width:4.74mm;background:#0E0E0D"></i><i class="gap" style="flex:1 0 0"></i><i style="flex:45 0 0;width:4.99mm;background:#6E1946"></i><i class="gap" style="flex:18 0 0"></i><i style="flex:7 0 0;width:4.99mm;background:#3F1231"></i><i class="gap" style="flex:1 0 0"></i><i style="flex:15 0 0;width:4.91mm;background:#91B9B4"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:7 0 0;width:4.74mm;background:#86412A"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:18 0 0;width:4.4mm;background:#EB5A3C"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:6 0 0;width:4.4mm;background:#FAC39B"></i><i class="gap" style="flex:19 0 0"></i><i style="flex:6 0 0;width:4.99mm;background:#B0131E"></i><i class="gap" style="flex:2 0 0"></i><i style="flex:100 0 0;width:4.99mm;background:#B41932"></i><i class="gap" style="flex:1 0 0"></i><i style="flex:5 0 0;width:4.99mm;background:#FF9619"></i><i class="gap" style="flex:19 0 0"></i><i style="flex:7 0 0;width:4.74mm;background:#0F2837"></i><i class="gap" style="flex:8 0 0"></i><i style="flex:52 0 0;width:4.74mm;background:#91B9B4"></i><i class="gap" style="flex:19 0 0"></i></div>
+
+  <!-- شعار وزارة الثقافة — مستخرج من الكليشة الرسمية -->
+  <img class="moc-logo" src="data:image/png;base64,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" alt="" />
+
+  <!-- العنوان -->
+  <h1 class="sheet-title">استمارة التقويم الختامي لأنشطة أساسيات الرسم</h1>
+
+  <!-- بيانات الطالب — عمودان كما في الكليشة -->
+  <div class="sheet-fields">
+    <div class="field-col">
+      <div style="display:flex;align-items:baseline;gap:5px;margin-top:4.5mm">
+    <span style="font-size:12pt;font-weight:700;color:#1a1a1a;white-space:nowrap">اسم المعلم:</span>
+    <span style="font-size:12pt;font-weight:700;color:#0F4761;padding-bottom:1px">أ. أحمد فاروق</span>
+  </div>
+      <div style="display:flex;align-items:baseline;gap:5px;margin-top:4.5mm">
+    <span style="font-size:12pt;font-weight:700;color:#1a1a1a;white-space:nowrap">التاريخ:</span>
+    <span style="font-size:12pt;font-weight:700;color:#0F4761;padding-bottom:1px">2026-10-06</span>
+  </div>
+    </div>
+    <div class="field-col">
+      <div style="display:flex;align-items:baseline;gap:5px;margin-top:4.5mm">
+    <span style="font-size:12pt;font-weight:700;color:#1a1a1a;white-space:nowrap">اسم الطالب:</span>
+    <span style="font-size:12pt;font-weight:700;color:#0F4761;padding-bottom:1px">عبدالعزيز طلال القحطاني</span>
+  </div>
+      
+    </div>
+  </div>
+
+  <!-- جدول البنود -->
+  <table style="width:100%;border-collapse:collapse;direction:rtl;table-layout:fixed;border:1.25pt solid #6E1946">
+    <colgroup><col style="width:51.5%"><col style="width:15.2%"><col style="width:16.2%"><col style="width:17.1%"><col style="width:undefined%"></colgroup>
+    <thead><tr style="height:9mm"><th style="width:51.5%;background:#0F2837;color:#ffffff;border:0.75pt solid #9E8288;padding:3px 6px;text-align:right;font-size:11pt;font-weight:900">موشرات التحقق</th><th style="width:15.2%;background:#0F2837;color:#ffffff;border:0.75pt solid #9E8288;padding:3px 3px;text-align:center;font-size:10pt;font-weight:900;line-height:1.25">درجة<br/>التحقق</th><th style="width:16.2%;background:#0F2837;color:#ffffff;border:0.75pt solid #9E8288;padding:3px 3px;text-align:center;font-size:10pt;font-weight:900;line-height:1.25">الدرجة القصوى</th><th style="width:17.1%;background:#6E1946;color:#ffffff;border:0.75pt solid #9E8288;padding:3px 3px;text-align:center;font-size:10pt;font-weight:900">درجة الطالب</th></tr></thead>
+    <tbody><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">يتقن بناء الوجه ورسم ملامحه وفق النسب والعلاقات الصحيحه</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">6</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">4</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">يطبق تقنيات التظليل لاظهار الضوء والظل والحجم والعمق</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">6</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">5</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">يطبق قواعد المنظور وخطوط الهروب ونقاط التلاشي بصوره صحيحه</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">6</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">7</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">5</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">يراعي اختلاف احجام العناصر لاظهار القرب والبعد داخل المشهد</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">4</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">4</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">يوظف الشخصيات والمباني والعناصر المختلفه داخل مشهد مترابط</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">4</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">4</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">ينظم العناصر داخل العمل الفني محققا التوازن ومركز السياده</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">4</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">4</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">يستخدم درجات اقلام الرصاص والخطوط والملامس بما يخدم العمل الفني</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">4</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">4</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">يحافظ علي دقه الخطوط ونظافه العمل وتنظيمه في الاخراج النهايي</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">4</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">4</td></tr><tr style="height:7.5mm"><td style="border:0.75pt solid #9E8288;background:#FDF4F5;padding:2px 7px;text-align:right;font-size:10pt;font-weight:700;color:#111;line-height:1.4;vertical-align:middle">ينجز عملا فنيا نهاييا متكاملا يجمع مهارات المنظور والشخصيات والظلال والتكوين</td><td style="width:15.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">5</td>
+           <td style="width:16.2%;background:#F2D8DD;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;font-size:10.5pt;font-weight:900">6</td>
+           <td style="width:17.1%;background:#6E1946;border:0.75pt solid #9E8288;text-align:center;vertical-align:middle;padding:0;font-size:14pt;font-weight:900;color:#ffffff">5</td></tr></tbody>
+  </table>
+
+  <!-- المجموع -->
+  <div style="display:flex;align-items:baseline;gap:5mm;margin-top:6mm;width:100%;margin-left:auto">
+    <span style="font-size:11.5pt;font-weight:900;color:#111;white-space:nowrap">المجموع:</span>
+    <span style="min-width:24mm;text-align:center;font-size:12.5pt;font-weight:900;color:#6E1946;border-bottom:0.75pt dotted #9E8288">٣٩</span>
+    <span style="font-size:11.5pt;font-weight:900;color:#111;white-space:nowrap">من ٥٠</span>
+  </div>
+
+  <!-- جدول الفئات — للتقييم التكويني فقط (مقياس 20 درجة) -->
+  
+
+  <!-- الملاحظات الرسمية — التقويم الختامي فقط -->
+  <ol style="width:118mm;margin:2.5mm 0 0 auto;padding-right:5.5mm;direction:rtl;font-size:9.5pt;line-height:1.65;color:#111">
+      <li style="margin:0;padding:0">أعلى من 40 درجة الطالب موهوب يحتاج برنامج فردي لتطوير موهبته</li>
+      <li style="margin:0;padding:0">من 36 إلى 40 درجة الطالب متقن يظهر إتقاناً للمهارات المطلوبة</li>
+      <li style="margin:0;padding:0">من 20 إلى 35 درجة الطالب اقترب من تحقيق الهدف يظهر أداء مقبولاً مع قابلية للتحسن</li>
+      <li style="margin:0;padding:0">أقل من 20 درجة الطالب دون الأهداف يحتاج خطة فردية للتطوير والمتابعة المستمرة</li>
+    </ol>
+
+  <!-- التذييل — كما في الكليشة الرسمية: السطر الأول عريض والشريط الفاتح تحته -->
+  <div class="sheet-foot">
+    <div class="foot-en">
+      <b>Ministry of Culture</b><br />
+      King Faisal Road, Al Dirriyah<br />
+      P.O. Box 3424, Riyadh 13711<br />
+      Kingdom of Saudi Arabia
+    </div>
+    <div class="foot-mid">
+      T +966 11 836 3352 م<br />
+      F +966 11 836 3333 ف<br />
+      moc.gov.sa
+    </div>
+    <div class="foot-ar">
+      <b>وزارة الثقافة</b><br />
+      طريق الملك فيصل، الدرعية<br />
+      ص.ب. 3424، الرياض 13711<br />
+      المملكة العربية السعودية
+    </div>
+  </div>
+</div>
+</body>
+</html>

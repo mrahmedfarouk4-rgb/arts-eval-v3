@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>تصميم أ — لوحة العمل</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#20242B}
+.wrap{display:flex;gap:22px;padding:22px;align-items:flex-start;min-height:100vh}
+.col{display:flex;flex-direction:column;gap:9px}
+.cap{color:#fff;font-size:12.5px;font-weight:700}
+.cap span{color:rgba(255,255,255,.45);font-weight:400;font-size:11px;margin-right:8px}
+.phone{width:366px;height:800px;border-radius:34px;overflow:hidden;background:#0F1115;
+  box-shadow:0 26px 60px rgba(0,0,0,.55);color:#E4E7EC}
+.cmd{display:flex;align-items:center;gap:9px;margin:10px;padding:11px 13px;border-radius:11px;
+  background:#171A21;border:1px solid #232833}
+.cmd .k{width:20px;height:20px;border-radius:6px;background:#FBE122;flex:none;color:#0F1115;
+  font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.cmd .t{flex:1;color:#98A2B3;font-size:12.5px}
+.cmd .s{font-size:10px;color:#5C6673;border:1px solid #2A2F3A;border-radius:5px;padding:2px 6px}
+.rail{display:flex;gap:6px;padding:2px 14px 0}
+.rail div{flex:1;text-align:center;font-size:10.5px;padding:8px 0;border-radius:9px;color:#7C8794}
+.rail div.on{background:#1B1F27;color:#FBE122;font-weight:700}
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:11px 14px}
+.tile{border-radius:14px;padding:13px;background:#171A21;border:1px solid #232833;
+  display:flex;flex-direction:column;justify-content:space-between}
+.tile.wide{grid-column:span 2}
+.tile.tall{grid-row:span 2}
+.tile h4{font-size:10.5px;color:#7C8794;font-weight:600;margin-bottom:8px}
+.tile .n{font-size:29px;font-weight:800;letter-spacing:-.5px;line-height:1}
+.tile .u{font-size:10px;color:#5C6673;margin-top:3px}
+.tile .note{font-size:11px;color:#98A2B3;line-height:1.6}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
+.chipx{font-size:10.5px;padding:6px 11px;border-radius:999px;background:#1F2430;color:#C6CDD8}
+.chipx.on{background:#FBE122;color:#0F1115;font-weight:700}
+.ring{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+.ring i{width:44px;height:44px;border-radius:50%;background:#171A21;display:flex;
+  align-items:center;justify-content:center;font-size:12px;font-weight:800;font-style:normal}
+.dots{display:flex;gap:4px;margin:2px 0 9px}
+.dots i{width:6px;height:6px;border-radius:3px;background:#2A2F3A}
+.legend{display:flex;align-items:center;gap:5px;margin-top:9px;font-size:9.5px;color:#5C6673}
+.legend b{width:9px;height:9px;border-radius:3px;display:block}
+.bar{height:5px;border-radius:3px;background:#232833;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:#FBE122}
+.tbl{padding:2px 14px 14px}
+.trow{display:flex;align-items:center;gap:11px;padding:12px 4px;border-bottom:1px solid #1E232C}
+.cb{width:16px;height:16px;border-radius:5px;border:1.5px solid #39404C;flex:none}
+.cb.on{background:#FBE122;border-color:#FBE122}
+.tx{flex:1}
+.tx b{display:block;font-size:13px}
+.tx small{font-size:10.5px;color:#7C8794}
+.n2{font-size:11px;color:#5C6673;font-variant-numeric:tabular-nums}
+.tlab{font-size:10.5px;color:#7C8794;padding:14px 4px 5px;font-weight:700}
+.tabbar{display:flex;margin-top:auto;border-top:1px solid #1E232C}
+.tabbar div{flex:1;text-align:center;font-size:10px;padding:11px 0;color:#7C8794}
+.tabbar div.on{color:#FBE122;font-weight:700}
+</style></head>
+<body>
+<div class="wrap">
+
+  <div class="col">
+    <div class="cap">١ · لوحة العمل <span>الرئيسية — نمط الموزاييك (Notion / Linear / Arc)</span></div>
+    <div class="phone">
+      <div class="cmd"><span class="k">أ</span><span class="t">ابحث عن طالب أو مقرر…</span><span class="s">⌘K</span></div>
+      <div class="rail"><div class="on">العمل</div><div>الطلاب</div><div>السجل</div><div>المزيد</div></div>
+      <div class="bento">
+        <div class="tile wide">
+          <h4>اليوم · الأحد ١٨ أكتوبر</h4>
+          <div class="chips"><span class="chipx on">ابدأ تقييماً</span><span class="chipx">أضف طالباً</span><span class="chipx">ولّد خطة الفصل</span></div>
+          <div class="note">٤ تقييمات موعدها اليوم — أقربها ٠٩:٣٠</div>
+        </div>
+        <div class="tile"><h4>طلابك</h4><div><div class="n">٣٨</div><div class="u">في ٤ مراحل</div></div></div>
+        <div class="tile"><h4>تقييمات اليوم</h4><div><div class="n">٤</div><div class="u">٢ مكتملة</div></div></div>
+        <div class="tile wide">
+          <div style="display:flex;align-items:center;gap:13px">
+            <div class="ring" style="background:conic-gradient(#FBE122 0 66%,#232833 66% 100%)"><i>٦٦٪</i></div>
+            <div style="flex:1">
+              <h4 style="margin-bottom:2px">هذا الأسبوع</h4>
+              <div class="n" style="font-size:21px">١٢ <span style="font-size:12px;color:#5C6673">/ ١٨</span></div>
+              <div class="bar"><i style="width:66%"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="tile tall">
+          <h4>مقرراتك</h4>
+          <div class="dots"><i style="background:#007886"></i><i style="background:#007886"></i><i style="background:#1B7A42"></i><i style="background:#9056A1"></i><i></i><i></i><i></i></div>
+          <div class="note">٧ مقررات<br>٥٩٢ بنداً<br>٢٤٠٠ درجة متاحة</div>
+          <div class="legend"><b style="background:#007886"></b><b style="background:#1B7A42"></b><b style="background:#9056A1"></b>أنواع التقييم</div>
+        </div>
+        <div class="tile"><h4>متوسط الحضور</h4><div><div class="n">٩٢٪</div><div class="u">هذا الشهر</div></div></div>
+      </div>
+      <div class="tabbar"><div class="on">العمل</div><div>الطلاب</div><div>السجل</div><div>المزيد</div></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="cap">اختيار المقرر <span>نمط الجدول — قوائم بمربّعات اختيار</span></div>
+    <div class="phone">
+      <div class="cmd"><span class="k">أ</span><span class="t">الصف الثاني المتوسط · الفصل الأول</span></div>
+      <div class="tbl">
+        <div class="tlab">٣ مقررات — اضغط لتفعيلها</div>
+        <div class="trow"><span class="cb on"></span><div class="tx"><b>أساسيات الرسم</b><small>تكويني · مرحلي · ختامي</small></div><span class="n2">١٦ بنداً</span></div>
+        <div class="trow"><span class="cb"></span><div class="tx"><b>الألوان المائية</b><small>تكويني · مرحلي · ختامي</small></div><span class="n2">١٦ بنداً</span></div>
+        <div class="trow"><span class="cb"></span><div class="tx"><b>الرسم الرقمي</b><small>تكويني · مرحلي · ختامي</small></div><span class="n2">١٦ بنداً</span></div>
+        <div class="tlab">إجراءات</div>
+        <div class="trow"><span class="cb"></span><div class="tx"><b>توليد خطة الفصل الثاني</b><small>ينشئ ١١٤ استمارة فارغة</small></div><span class="n2">×</span></div>
+        <div class="trow" style="border:0"><span class="cb"></span><div class="tx"><b>تصدير نسخة احتياطية</b><small>JSON لكل الطلاب والتقييمات</small></div><span class="n2">×</span></div>
+      </div>
+      <div class="tabbar"><div class="on">العمل</div><div>الطلاب</div><div>السجل</div><div>المزيد</div></div>
+    </div>
+  </div>
+
+</div>
+</body></html>

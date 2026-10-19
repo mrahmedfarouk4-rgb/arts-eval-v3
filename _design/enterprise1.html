@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>١ · لوحة الرؤى — Analytics Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#F4F6F9;color:#1C2733}
+.wrap{padding:24px;min-height:100vh}
+.cap{color:#0F2837;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#707080;font-weight:400;font-size:11px;margin-right:8px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.kpi{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px}
+.kpi .v{font-size:32px;font-weight:800;color:#0F2837;letter-spacing:-1px;line-height:1}
+.kpi .u{font-size:11px;color:#707080;margin-top:4px}
+.kpi .t{font-size:12px;color:#41546B;margin-top:8px;font-weight:600}
+.kpi .spark{height:36px;margin-top:10px}
+.card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;overflow:hidden}
+.card.hd{padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:14px;font-weight:700;color:#0F2837}
+.card.hd .act{font-size:11px;color:#007886;cursor:pointer}
+.heat{padding:16px}
+.hrow{display:flex;gap:12px;margin-bottom:10px;align-items:center}
+.hrow .lbl{width:200px;font-size:12px;color:#41546B}
+.hrow .bar{flex:1;height:28px;background:#E2E8F0;border-radius:6px;overflow:hidden;position:relative}
+.hrow .bar i{display:block;height:100%;background:#0F2837;border-radius:6px}
+.hrow .bar i.low{background:#C03944}
+.hrow .bar i.mid{background:#FBE122}
+.hrow .val{width:60px;font-size:11px;color:#707080;text-align:left}
+.alerts{padding:16px;background:#FBF7E8;border-top:1px solid #E2E8F0}
+.alert{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #F0E2B4}
+.alert:last-child{border:0}
+.alert .ic{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}
+.alert.w .ic{background:#FBE122;color:#0F1115}
+.alert.i .ic{background:#007886;color:#fff}
+.alert.c .ic{background:#C03944;color:#fff}
+.alert .tx{flex:1;font-size:12px;line-height:1.6}
+.alert .tx b{color:#1C2733}
+.alert .tx .meta{color:#707080;font-size:10.5px;margin-top:2px;display:block}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="cap">١ · لوحة الرؤى <span>Analytics-First — لصانع القرار / مدير التربية الفنية</span></div>
+  <div class="grid">
+    <div class="kpi"><div class="v">٢٣٤</div><div class="u">طالب نشط</div><div class="t">هذا الأسبوع</div><div class="spark"><svg viewBox="0 0 100 36"><polyline fill="none" stroke="#0F2837" stroke-width="2" points="0,30 12,28 24,22 36,18 48,20 60,15 72,12 84,10 100,8"/></svg></div></div>
+    <div class="kpi"><div class="v">٨٧٪</div><div class="u">نسبة الإنجاز</div><div class="t">+٤٪ عن الأسبوع الماضي</div><div class="spark"><svg viewBox="0 0 100 36"><polyline fill="none" stroke="#1B7A42" stroke-width="2" points="0,20 12,18 24,16 36,14 48,12 60,10 72,8 84,6 100,4"/></svg></div></div>
+    <div class="kpi"><div class="v">١٢</div><div class="u">معلم نشط</div><div class="t">٣ معلمين غابوا</div><div class="spark"><svg viewBox="0 0 100 36"><polyline fill="none" stroke="#007886" stroke-width="2" points="0,28 12,26 24,24 36,22 48,20 60,18 72,16 84,14 100,12"/></svg></div></div>
+    <div class="kpi"><div class="v">٣.٢</div><div class="u">أسبوع/تقييم</div><div class="t">الحد الأدنى ٢.٥</div><div class="spark"><svg viewBox="0 0 100 36"><polyline fill="none" stroke="#9056A1" stroke-width="2" points="0,18 12,17 24,16 36,15 48,14 60,13 72,12 84,11 100,10"/></svg></div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card" style="height:380px">
+      <div class="card hd"><h3>خريطة حرارية: الإنجاز × المرحلة × النوع</h3><span class="act">تصدير PNG</span></div>
+      <div class="heat">
+        <div class="hrow"><span class="lbl">المتوسطة · تكويني</span><div class="bar"><i style="width:87%"></i></div><span class="val">٨٧٪</span></div>
+        <div class="hrow"><span class="lbl">المتوسطة · مرحلي</span><div class="bar"><i style="width:76%"></i></div><span class="val">٧٦٪</span></div>
+        <div class="hrow"><span class="lbl">المتوسطة · ختامي</span><div class="bar"><i style="width:68%"><i class="mid"></i></i></div><span class="val">٦٨٪</span></div>
+        <div class="hrow"><span class="lbl">الابتدائية · تكويني</span><div class="bar"><i style="width:82%"></i></div><span class="val">٨٢٪</span></div>
+        <div class="hrow"><span class="lbl">الابتدائية · مرحلي</span><div class="bar"><i style="width:71%"><i class="mid"></i></i></div><span class="val">٧١٪</span></div>
+        <div class="hrow"><span class="lbl">الابتدائية · ختامي</span><div class="bar"><i style="width:59%"><i class="low"></i></i></div><span class="val">٥٩٪</span></div>
+      </div>
+    </div>
+    <div class="card" style="height:380px">
+      <div class="card hd"><h3>أفضل/أسوأ ٥</h3></div>
+      <div style="padding:16px">
+        <div style="margin-bottom:14px"><b style="color:#1B7A42">أعلى إنجاز</b></div>
+        <div style="font-size:12px;margin:4px 0"><b>ريم العتيبي</b> · المتوسطة · ٩٨٪ <span style="color:#1B7A42">●●●●●</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>سلمان الحربي</b> · المتوسطة · ٩٦٪ <span style="color:#1B7A42">●●●●○</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>فهد الشمري</b> · المتوسطة · ٩٤٪ <span style="color:#1B7A42">●●●○○</span></div>
+        <div style="margin-top:14px"><b style="color:#C03944">أدنى إنجاز</b></div>
+        <div style="font-size:12px;margin:4px 0"><b>نورة القحطاني</b> · الابتدائية · ٥٤٪ <span style="color:#C03944">●○○○○</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>ماجد الشمري</b> · المتوسطة · ٥٧٪ <span style="color:#C03944">●○○○○</span></div>
+        <div style="font-size:12px;margin:4px 0"><b>هند العتيبي</b> · المتوسطة · ٦١٪ <span style="color:#C03944">●●○○○</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card hd"><h3>تنبيهات ذكية</h3></div>
+    <div class="alerts">
+      <div class="alert w"><div class="ic">⚠</div><div class="tx"><b>٣ معلمين</b> لم يسجلوا تقييمات منذ ٧ أيام<div class="meta">مهلة SLA: ٣ أيام متبقية</div></div></div>
+      <div class="alert i"><div class="ic">ℹ</div><div class="tx"><b>١٢ طالباً</b> دون التقييم التكويني للوحدة الحالية<div class="meta">الموعد النهائي: بعد ٣ أيام</div></div></div>
+      <div class="alert c"><div class="ic">⚠</div><div class="tx"><b>اتجاه تنازلي</b> في «الألوان المائية» للأسبوع الثالث<div class="meta">انخفاض ٨٪ عن المتوسط</div></div></div>
+      <div class="alert w"><div class="ic">⚠</div><div class="tx"><b>٢ استمارة</b> «الفنون السعودية» ناقصة التوقيع<div class="meta">منذ ٥ أيام · يتطلب تصعيد</div></div></div>
+    </div>
+  </div>
+</div>
+</body></html>

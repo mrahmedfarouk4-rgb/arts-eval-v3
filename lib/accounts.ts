@@ -1,0 +1,461 @@
+/**
+ * حسابات المعلمين والمشرف — تُدار من داخل التطبيق.
+ * ---------------------------------------------------------------------------
+ * القرار المعتمد:
+ *   • زرع حساب المشرف `admin` / `admin` عند أول تشغيل — كلمة المرور
+ *     الأساسية التي طلبها المالك. بعد الدخول يغيّرها المشرف، فتصبح كلمة سره.
+ *   • لكل حساب **كلمة سر خاصة به** — المعلم يدخل باسمه وكلمته، لا بواحدة
+ *     يقاسمها الجميع. (سابقاً كانت المعلمين يتقاسمون كلمة واحدة.)
+ *   • لكل حساب **مقررات مسندة** — المعلم لا يرى في التقييم إلا مقرراته.
+ *     المشرف يرى كل المقررات.
+ *
+ * ⚠ كلمة المرور الافتراضية `admin` تسافر مع التطبيق، فمن ملك نسخة APK
+ *   يستطيع فتح لوحة المشرف. لذلك تُعرض تحذير ثابت في الإعدادات حتى
+ *   تُغيَّر، وهذا لكطرك.
+ */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sha256Hex } from '@/lib/sha256';
+import type { SubjectId } from '@/constants/criteria';
+
+const K_ACCOUNTS = '@v2/accounts';
+const K_SESSION = '@v2/auth';
+
+export type Role = 'admin' | 'teacher';
+
+/** حساب المشرف المبدئي — يُزرع مرّة واحدة عند أول تشغيل */
+export const DEFAULT_ADMIN = {
+  username: 'admin',
+  password: 'admin',
+  name: 'المشرف',
+} as const;
+
+export interface Account {
+  id: string;
+  /** اسم الدخول — فريد، بلا مسافات */
+  username: string;
+  /** الاسم الظاهر في «اسم المعلم» بالاستمارات */
+  name: string;
+  role: Role;
+  enabled: boolean;
+  /**
+   * SHA-256 لكلمة سر **هذا الحساب**.
+   * لا تُخزَّن نصّية أبداً — `exportAll` يصدّر كل البيانات في JSON يُرسل.
+   */
+  pwHash: string;
+  /** المقررات المسندة — المعلم لا يرى غيرها. المشرف يتجاوز هذا الحد. */
+  subjectIds: SubjectId[];
+  createdAt: string;
+}
+
+interface AccountsFile {
+  accounts: Account[];
+  /**
+   * كلمتا سر قديمتان مشتركتان — باقيتان للترحيل فقط.
+   * الحسابات المنقولة تأخذ منها `pwHash` مرّة واحدة ثم reliance تصير
+   * على `Account.pwHash` وحدها.
+   */
+  teacherPwHash: string;
+  adminPwHash: string;
+}
+
+const EMPTY: AccountsFile = { accounts: [], teacherPwHash: '', adminPwHash: '' };
+
+/** ملح ثابت — يمنع أن يكون التجزئة لكلمة سر معروفة قابلةً للبحث العكسي */
+const SALT = 'artseval.v2.';
+
+function hashPassword(pw: string): string {
+  return sha256Hex(SALT + pw);
+}
+
+/* ------------------------------------------------------------------ */
+/*  التخزين                                                           */
+/* ------------------------------------------------------------------ */
+
+function newId(): string {
+  return `acc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function save(f: AccountsFile): Promise<void> {
+  await AsyncStorage.setItem(K_ACCOUNTS, JSON.stringify(f));
+}
+
+/**
+ * يرفع ملف الحسابات القديم إلى الصيغة الحالية.
+ *
+ * الفرقان الجوهريان:
+ *   1. `subjectIds` لم تكن موجودة → مصفوفة فارغة (المعلم لن يرى مقرراً
+ *      حتى يُسنده المشرف، وهذا أأمن من منحه كل المقررات بلا قصد).
+ *   2. `pwHash` كانت فارغة للمعلمين لأن كلمة سرهم مشتركة →
+ *      ننسخ التجزئة المشتركة إلى كل حساب مرة واحدة.
+ */
+function migrate(f: AccountsFile): AccountsFile {
+  let changed = false;
+
+  const accounts = f.accounts.map((a) => {
+    const subjectIds: SubjectId[] = Array.isArray(a.subjectIds) ? a.subjectIds : [];
+    let pwHash = a.pwHash ?? '';
+
+    if (!pwHash) {
+      const shared = a.role === 'admin' ? f.adminPwHash : f.teacherPwHash;
+      if (shared) pwHash = shared;
+    }
+    if (pwHash !== (a.pwHash ?? '')) changed = true;
+    if (subjectIds !== a.subjectIds) changed = true;
+
+    return { ...a, pwHash, subjectIds };
+  });
+
+  return changed ? { ...f, accounts } : f;
+}
+
+function seedAdmin(): AccountsFile {
+  const f: AccountsFile = { ...EMPTY, accounts: [] };
+  f.accounts.push({
+    id: newId(),
+    username: DEFAULT_ADMIN.username,
+    name: DEFAULT_ADMIN.name,
+    role: 'admin',
+    enabled: true,
+    pwHash: hashPassword(DEFAULT_ADMIN.password),
+    subjectIds: [],
+    createdAt: new Date().toISOString(),
+  });
+  f.adminPwHash = hashPassword(DEFAULT_ADMIN.password);
+  return f;
+}
+
+async function load(): Promise<AccountsFile> {
+  let raw: AccountsFile = { ...EMPTY };
+
+  try {
+    const text = await AsyncStorage.getItem(K_ACCOUNTS);
+    if (text) {
+      const parsed = JSON.parse(text) as AccountsFile;
+      raw = {
+        accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
+        teacherPwHash: parsed.teacherPwHash ?? '',
+        adminPwHash: parsed.adminPwHash ?? '',
+      };
+    }
+  } catch {
+    // ملف تالف — نُعيد الزرع بدل أن نترك التطبيق بلا دخول
+    const fresh = seedAdmin();
+    await save(fresh);
+    return fresh;
+  }
+
+  // أول تشغيل: زرع المشرف  admin / admin
+  if (!raw.accounts.length) {
+    const fresh = seedAdmin();
+    await save(fresh);
+    return fresh;
+  }
+
+  const migrated = migrate(raw);
+  if (migrated !== raw) await save(migrated);
+  return migrated;
+}
+
+/* ------------------------------------------------------------------ */
+/*  القراءة                                                           */
+/* ------------------------------------------------------------------ */
+
+export async function listAccounts(): Promise<Account[]> {
+  return (await load()).accounts;
+}
+
+/** هل يوجد حساب مشرف؟ — زرعُه يضمن وجوده دائماً */
+export async function hasAdmin(): Promise<boolean> {
+  return (await load()).accounts.some((a) => a.role === 'admin');
+}
+
+export async function getAccountByUsername(username: string): Promise<Account | null> {
+  const u = normalizeUsername(username);
+  return (await load()).accounts.find((a) => a.username === u) ?? null;
+}
+
+export function normalizeUsername(u: string): string {
+  return u.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * هل ما زالت كلمة سر المشرف هي الافتراضية `admin`؟
+ * تُستخدم لإظهار تحذير دائم في الإعدادات حتى تُغيَّر.
+ */
+export async function isAdminPasswordDefault(): Promise<boolean> {
+  const f = await load();
+  const admins = f.accounts.filter((a) => a.role === 'admin');
+  if (!admins.length) return false;
+  const def = hashPassword(DEFAULT_ADMIN.password);
+  return admins.every((a) => a.pwHash === def);
+}
+
+/** المقررات التي يراها هذا الحساب — المشرف يرى كل شيء */
+export function visibleSubjects(
+  account: { role: Role; subjectIds?: SubjectId[] } | null,
+  all: SubjectId[]
+): SubjectId[] {
+  if (!account) return all;
+  if (account.role === 'admin') return all;
+  const assigned = account.subjectIds ?? [];
+  if (!assigned.length) return [];
+  const set = new Set(assigned);
+  return all.filter((id) => set.has(id));
+}
+
+/* ------------------------------------------------------------------ */
+/*  إدارة الحسابات                                                    */
+/* ------------------------------------------------------------------ */
+
+function validateUsername(f: AccountsFile, username: string, exceptId?: string): string | null {
+  if (!username) return 'اسم المستخدم مطلوب.';
+  if (username.length < 3) return 'اسم المستخدم قصير جداً (٣ أحرف على الأقل).';
+  if (f.accounts.some((a) => a.username === username && a.id !== exceptId)) {
+    return 'اسم المستخدم «' + username + '» مستخدم بالفعل.';
+  }
+  return null;
+}
+
+export async function addAccount(input: {
+  username: string;
+  name: string;
+  role: Role;
+  subjectIds: SubjectId[];
+  /** كلمة سره الأولى — بلاها لا يستطيع الدخول */
+  password?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const f = await load();
+  const username = normalizeUsername(input.username);
+  const name = input.name.trim();
+
+  const bad = validateUsername(f, username);
+  if (bad) return { ok: false, error: bad };
+  if (!name) return { ok: false, error: 'الاسم الظاهر مطلوب.' };
+  if (input.role === 'admin' && !f.accounts.some((a) => a.role === 'admin')) {
+    return { ok: false, error: 'يجب إنشاء حساب مشرف أولاً.' };
+  }
+  if (!input.password) return { ok: false, error: 'كلمة سر الحساب مطلوبة.' };
+  const weak = weakPassword(input.password, username);
+  if (weak) return { ok: false, error: weak };
+
+  f.accounts.push({
+    id: newId(),
+    username,
+    name,
+    role: input.role,
+    enabled: true,
+    pwHash: hashPassword(input.password),
+    subjectIds: input.subjectIds ?? [],
+    createdAt: new Date().toISOString(),
+  });
+  await save(f);
+  return { ok: true };
+}
+
+export async function updateAccount(
+  id: string,
+  patch: Partial<Pick<Account, 'username' | 'name' | 'role' | 'enabled' | 'subjectIds'>>
+): Promise<{ ok: boolean; error?: string }> {
+  const f = await load();
+  const i = f.accounts.findIndex((a) => a.id === id);
+  if (i < 0) return { ok: false, error: 'الحساب غير موجود.' };
+
+  let next = { ...patch };
+
+  if (patch.username !== undefined) {
+    const u = normalizeUsername(patch.username);
+    const bad = validateUsername(f, u, id);
+    if (bad) return { ok: false, error: bad };
+    next.username = u;
+  }
+  if (patch.name !== undefined && !patch.name.trim()) {
+    return { ok: false, error: 'الاسم الظاهر مطلوب.' };
+  }
+  // لا نترك التطبيق بلا مشرف إطلاقاً
+  if (patch.role === 'teacher') {
+    const a = f.accounts[i];
+    if (a.role === 'admin' && !f.accounts.some((x) => x.id !== id && x.role === 'admin')) {
+      return { ok: false, error: 'لا يمكن أن يبقى التطبيق بلا حساب مشرف.' };
+    }
+  }
+
+  f.accounts[i] = { ...f.accounts[i], ...next };
+  await save(f);
+  return { ok: true };
+}
+
+export async function deleteAccount(id: string): Promise<{ ok: boolean; error?: string }> {
+  const f = await load();
+  const i = f.accounts.findIndex((a) => a.id === id);
+  if (i < 0) return { ok: false, error: 'الحساب غير موجود.' };
+  if (f.accounts[i].role === 'admin' && !f.accounts.some((a) => a.id !== id && a.role === 'admin')) {
+    return { ok: false, error: 'لا يمكن حذف آخر حساب مشرف.' };
+  }
+  f.accounts.splice(i, 1);
+  await save(f);
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------------ */
+/*  كلمات السر                                                        */
+/* ------------------------------------------------------------------ */
+
+const DEFAULT_PW_HASH = hashPassword(DEFAULT_ADMIN.password);
+
+/** كلمة سر ضعيفة معروفة — نرفضها للحسابات الجديدة وننبّه على الموجود */
+function weakPassword(pw: string, username: string): string | null {
+  if (pw.length < 4) return 'كلمة السر قصيرة جداً (٤ خانات على الأقل).';
+  if (pw.trim().toLowerCase() === username.trim().toLowerCase()) {
+    return 'كلمة السر لا تكون نفس اسم المستخدم.';
+  }
+  return null;
+}
+
+/** هل كلمة السر هذه هي الافتراضية `admin`؟ */
+export function isWeakDefault(pwHash: string): boolean {
+  return pwHash === DEFAULT_PW_HASH;
+}
+
+/** كلمة سر **هذا الحساب** — المدخل الخاص به */
+export async function setAccountPassword(
+  id: string,
+  password: string
+): Promise<{ ok: boolean; error?: string }> {
+  const f = await load();
+  const a = f.accounts.find((x) => x.id === id);
+  if (!a) return { ok: false, error: 'الحساب غير موجود.' };
+
+  const bad = weakPassword(password, a.username);
+  if (bad) return { ok: false, error: bad };
+
+  a.pwHash = hashPassword(password);
+  // كلمة سر المشرف خ人人都يتها تاريخياً — نبقيها متزامنة
+  if (a.role === 'admin') {
+    f.adminPwHash = a.pwHash;
+    f.accounts.forEach((x) => {
+      if (x.role === 'admin' && x.id !== id) x.pwHash = a.pwHash;
+    });
+  }
+  await save(f);
+  return { ok: true };
+}
+
+/** كلمة سر واحدة لكل حسابات دور معيّن — اختصار للإعداد السريع */
+export async function setRolePassword(
+  role: Role,
+  password: string
+): Promise<{ ok: boolean; error?: string }> {
+  const f = await load();
+  const targets = f.accounts.filter((a) => a.role === role);
+  if (!targets.length) return { ok: false, error: 'لا حسابات بهذا الدور.' };
+
+  const bad = weakPassword(password, targets[0].username);
+  if (bad) return { ok: false, error: bad };
+
+  const h = hashPassword(password);
+  targets.forEach((a) => { a.pwHash = h; });
+  if (role === 'admin') f.adminPwHash = h;
+  else f.teacherPwHash = h;
+
+  await save(f);
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------------ */
+/*  الدخول                                                           */
+/* ------------------------------------------------------------------ */
+
+export type AuthFailure =
+  | 'not-found'
+  | 'disabled'
+  | 'wrong-password'
+  | 'no-password'
+  | 'not-configured';
+
+export type AuthResult =
+  | { ok: true; account: Account }
+  | { ok: false; reason: AuthFailure };
+
+/**
+ * يحاول الدخول بحساب معروف — **بكلمة سره الخاصة**.
+ */
+export async function authenticate(
+  username: string,
+  password: string
+): Promise<AuthResult> {
+  const f = await load();
+  if (!f.accounts.length) return { ok: false, reason: 'not-configured' };
+
+  const u = normalizeUsername(username);
+  if (!u) return { ok: false, reason: 'not-found' };
+
+  const acc = f.accounts.find((a) => a.username === u);
+  if (!acc) return { ok: false, reason: 'not-found' };
+  if (!acc.enabled) return { ok: false, reason: 'disabled' };
+
+  // الحسابات المنقولة قد تكون فارغة التجزئة — نعود للكلمة المشتركة
+  const expected =
+    acc.pwHash || (acc.role === 'admin' ? f.adminPwHash : f.teacherPwHash);
+  if (!expected) return { ok: false, reason: 'no-password' };
+
+  if (hashPassword(password) !== expected) return { ok: false, reason: 'wrong-password' };
+
+  return { ok: true, account: { ...acc, subjectIds: acc.subjectIds ?? [] } };
+}
+
+/* ------------------------------------------------------------------ */
+/*  الجلسة                                                           */
+/* ------------------------------------------------------------------ */
+
+export interface SessionData {
+  accountId: string;
+  username: string;
+  name: string;
+  role: Role;
+  subjectIds: SubjectId[];
+  at: string;
+}
+
+export async function persistSession(account: Account): Promise<void> {
+  const s: SessionData = {
+    accountId: account.id,
+    username: account.username,
+    name: account.name,
+    role: account.role,
+    subjectIds: account.subjectIds ?? [],
+    at: new Date().toISOString(),
+  };
+  await AsyncStorage.setItem(K_SESSION, JSON.stringify(s));
+}
+
+export async function readSession(): Promise<SessionData | null> {
+  try {
+    const raw = await AsyncStorage.getItem(K_SESSION);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as SessionData;
+    if (!s?.accountId) return null;
+
+    const acc = (await load()).accounts.find((a) => a.id === s.accountId);
+    // إن حُذف الحساب أو عُطّل بعد تسجيل الدخول نُنهي الجلسة
+    if (!acc || !acc.enabled) {
+      await AsyncStorage.removeItem(K_SESSION);
+      return null;
+    }
+    // نُبقي الاسم والمقررات محدَّثة — عدّلها المشرف بعد الدخول
+    return {
+      accountId: acc.id,
+      username: acc.username,
+      name: acc.name,
+      role: acc.role,
+      subjectIds: acc.subjectIds ?? [],
+      at: s.at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearSession(): Promise<void> {
+  await AsyncStorage.removeItem(K_SESSION);
+}

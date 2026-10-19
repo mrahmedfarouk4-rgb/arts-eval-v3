@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>ب — معرض الأعمال — Gallery Portfolio Platform</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#FAF8F5;color:#2D2623}
+.wrap{padding:24px;min-height:100vh}
+.cap{color:#3D2B1F;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#8B7E6B;font-weight:400;font-size:11px;margin-right:8px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.kpi{background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:20px;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
+.kpi:nth-child(1)::before{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.kpi:nth-child(2)::before{background:linear-gradient(90deg,#1B6B5E,#2E9B7E)}
+.kpi:nth-child(3)::before{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+.kpi .v{font-size:28px;font-weight:800;color:#2D2623;letter-spacing:-0.5px}
+.kpi .u{font-size:11px;color:#8B7E6B;margin-top:4px}
+.kpi .t{font-size:11px;color:#8B7E6B;margin-top:6px;font-weight:600}
+.kpi .t::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}
+.kpi:nth-child(1) .t::before{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.kpi:nth-child(2) .t::before{background:linear-gradient(90deg,#1B6B5E,#2E9B7E)}
+.kpi:nth-child(3) .t::before{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+
+.card{background:#fff;border:1px solid #E8E4DF;border-radius:14px;overflow:hidden}
+.card.hd{padding:14px 20px;border-bottom:1px solid #E8E4DF;display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:14px;font-weight:700;color:#2D2623}
+.card.hd .act{font-size:11px;color:#C47A2D;cursor:pointer}
+
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:16px}
+.artwork{background:#fff;border:1px solid #E8E4DF;border-radius:12px;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.artwork:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(45,38,35,.12)}
+.artwork .img{aspect-ratio:4/3;background:#F5F3F0;overflow:hidden;position:relative}
+.artwork .img img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.artwork:hover .img img{transform:scale(1.04)}
+.artwork .img .type{position:absolute;top:10px;left:10px;font-size:10px;padding:4px 8px;border-radius:999px;background:rgba(45,38,35,.9);color:#fff;font-weight:600}
+.artwork .meta{padding:14px}
+.artwork .title{font-size:13px;font-weight:700;color:#2D2623;margin-bottom:4px}
+.artwork .artist{font-size:11px;color:#8B7E6B;margin-bottom:8px}
+.artwork .chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:9.5px;padding:3px 8px;border-radius:999px;background:#F5F3F0;border:1px solid #E8E4DF;color:#5D524A}
+.chip.t{background:linear-gradient(90deg,#C47A2D,#D49A4A);color:#fff;border:0}
+.chip.v{background:linear-gradient(90deg,#1B6B5E,#2E9B7E);color:#fff;border:0}
+.chip.u{background:linear-gradient(90deg,#2A4B8C,#3D6BC8);color:#fff;border:0}
+.chip.c{background:linear-gradient(90deg,#B85C3A,#C87A5A);color:#fff;border:0}
+.artwork .footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #E8E4DF;background:#FAF8F5}
+.artwork .stats{font-size:10.5px;color:#8B7E6B}
+.artwork .actions{display:flex;gap:6px}
+.btn{padding:6px 10px;border-radius:6px;font-size:10px;font-weight:600;border:1px solid transparent}
+.btn.g{background:linear-gradient(90deg,#1B6B5E,#2E9B7E);color:#fff}
+.artwork .badge{position:absolute;top:10px;right:10px;font-size:9px;padding:3px 8px;border-radius:999px;font-weight:700}
+.badge.n{background:#FFF3D0;color:#B87A2A}
+.badge.v{background:#E0F5F0;color:#1B6B5E}
+.badge.r{background:#FDE8E8;color:#A82C2C}
+.badge.s{background:#E0F5F0;color:#1B6B5E}
+
+.cap{color:#3D2B1F;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#8B7E6B;font-weight:400;font-size:11px;margin-right:8px}
+.wrap{padding:24px;min-height:100vh}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#FAF8F5;color:#2D2623}
+*{box-sizing:border-box;margin:0;padding:0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.kpi{background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:20px}
+.kpi .v{font-size:28px;font-weight:800;color:#2D2623;letter-spacing:-0.5px}
+.kpi .u{font-size:11px;color:#8B7E6B;margin-top:4px}
+.kpi .t{font-size:11px;color:#8B7E6B;margin-top:6px;font-weight:600}
+.kpi .t::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}
+.kpi:nth-child(1) .t::before{background:linear-gradient(90deg,#C47A2D,#D49A4A)}
+.kpi:nth-child(2) .t::before{background:linear-gradient(90deg,#1B6B5E,#2E9B7E)}
+.kpi:nth-child(3) .t::before{background:linear-gradient(90deg,#2A4B8C,#3D6BC8)}
+.card{background:#fff;border:1px solid #E8E4DF;border-radius:14px;overflow:hidden}
+.card.hd{padding:14px 20px;border-bottom:1px solid #E8E4DF;display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:14px;font-weight:700;color:#2D2623}
+.card.hd .act{font-size:11px;color:#C47A2D;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="cap">ب — معرض الأعمال <span>Gallery Portfolio — المعرض الدائم للأعمال الفنية</span></div>
+  <div class="grid">
+    <div class="kpi"><div class="v">١٢٧</div><div class="u">عمل معروض</div><div class="t">هذا الفصل</div></div>
+    <div class="kpi"><div class="v">٨٩</div><div class="u">فنان شاب</div><div class="t">من ٣ مراحل</div></div>
+    <div class="kpi"><div class="v">٥</div><div class="u">معارض نشطة</div><div class="t">٣ فعلية · ٢ افتراضية</div></div>
+  </div>
+  <div class="card" style="height:520px">
+    <div class="card hd"><h3>المعرض الدائم — أعمال مختارة</h3><span class="act">ترتيب: الأحدث</span></div>
+    <div class="gallery">
+      <div class="artwork"><div class="img"><span class="type">زيت</span><div class="badge n">جديد</div></div><div class="meta"><div class="title">غروب في الوادي</div><div class="artist">ريم العتيبي · الصف الثاني متوسط</div><div class="chips"><span class="chip t">زيت على قماش</span><span class="chip t">تكويني</span></div></div><div class="footer"><div class="stats">٩٨٪ إعجاب · ٢٣ تعليق</div><div class="actions"><button class="btn g">عرض</button></div></div></div>
+      <div class="artwork"><div class="img"><span class="type">مائي</span><div class="badge v">متميز</div></div><div class="meta"><div class="title">انعكاسات الصباح</div><div class="artist">سلمان الحربي · الصف الثاني متوسط</div><div class="chips"><span class="chip v">ألوان مائية</span><span class="chip v">مرحلي</span></div></div><div class="footer"><div class="stats">٩٥٪ إعجاب · ١٨ تعليق</div><div class="actions"><button class="btn g">عرض</button></div></div></div>
+      <div class="artwork"><div class="img"><span class="type">رقمي</span><div class="badge r">قيد المراجعة</div></div><div class="meta"><div class="title">مدينة المستقبل</div><div class="artist">فهد الشمري · الصف الثاني متوسط</div><div class="chips"><span class="chip u">رسم رقمي</span><span class="chip u">ختامي</span></div></div><div class="footer"><div class="stats">٨٧٪ إعجاب · ١٢ تعليق</div><div class="actions"><button class="btn g">عرض</button></div></div></div>
+      <div class="artwork"><div class="img"><span class="type">أكريليك</span><div class="badge s">مكتمل</div></div><div class="meta"><div class="title">أحلام اليقظة</div><div class="artist">نورة القحطاني · الصف الأول متوسط</div><div class="chips"><span class="chip s">أكريليك</span><span class="chip s">ختامي</span></div></div><div class="footer"><div class="stats">٩٢٪ إعجاب · ١٥ تعليق</div><div class="actions"><button class="btn g">عرض</button></div></div></div>
+      <div class="artwork"><div class="img"><span class="type">فحم</span><div class="badge n">جديد</div></div><div class="meta"><div class="title">وجوه من الذاكرة</div><div class="artist">ماجد الشمري · الصف الثاني متوسط</div><div class="chips"><span class="chip t">فحم</span><span class="chip t">تكويني</span></div></div><div class="footer"><div class="stats">٩٠٪ إعجاب · ٩ تعليقات</div><div class="actions"><button class="btn g">عرض</button></div></div></div>
+      <div class="artwork"><div class="img"><span class="type">كولاج</span><div class="badge v">متميز</div></div><div class="meta"><div class="title">قصص من التراث</div><div class="artist">هند العتيبي · الصف الثاني متوسط</div><div class="chips"><span class="chip v">كولاج</span><span class="chip v">مرحلي</span></div></div><div class="footer"><div class="stats">٩٤٪ إعجاب · ١١ تعليق</div><div class="actions"><button class="btn g">عرض</button></div></div></div>
+    </div>
+  </div>
+</div>
+</body></html>

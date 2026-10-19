@@ -1,50 +1,160 @@
-# Welcome to your Expo app 👋
+# بوابة تقييم الفنون البصرية — النسخة الجديدة (v2)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+نسخة معاد بناؤها من الصفر لتعمل أصلياً على **Android** و **iOS**، بنفس وظائف
+التطبيق الأصلي (`com.attendance.arts`) لكن بتصميم حديث وبيانات رسمية مضمّنة.
 
-## Get started
+---
 
-1. Install dependencies
+## ما الذي تغيّر عن التطبيق الأصلي؟
 
-   ```bash
-   npm install
-   ```
+| | التطبيق الأصلي (APK) | هذه النسخة |
+|---|---|---|
+| التقنية | Capacitor + React (ويب داخل غلاف) | React Native + Expo SDK 54 |
+| المنصة | Android فقط | Android + iOS أصلياً |
+| بنود التقييم | مخفية على سيرفر خارجي | **532 بنداً مضمّنة** داخل التطبيق |
+| العمل بدون إنترنت | ✗ لا يعمل | ✓ يعمل بالكامل |
+| الخط | يُحمَّل من Google Fonts عند التشغيل | 9 أوزان مضمّنة داخل الحزمة |
+| الطباعة | `window.print()` (ويب) | `expo-print` أصلي — PDF + مشاركة |
+| تخزين البيانات | سيرفر فقط | محلي أولاً + مزامنة اختيارية |
+| حفظ المسودات | غير موجود | حفظ تلقائي أثناء التعبئة |
+| درجة التحقق | غير معروضة | معروضة في التقويم الختامي |
+| التحقق من البيانات | — | أمر `npm run verify` |
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## بنود التقييم الرسمية
 
-In the output, you'll find options to open the app in a
+مستخرجة آلياً من وثائق المشروع الرسمية (٦ ملفات Word):
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| الملف | التغطية |
+|---|---|
+| `ملف آليات التقييم والتقويم - الصف الخامس والثاني متوسط` | الصف الخامس + الثاني متوسط، الفصلان |
+| `نماذج التقييم للفنون البصرية` | الصف الرابع + الأول المتوسط |
+| ٤ نسخ فردية لكل مرحلة/فصل | التحقق المتقاطع |
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### الأنواع الثلاثة
 
-## Get a fresh project
+| النوع | البنية | المجموع | التحويل |
+|---|---|---|---|
+| **weekly** — التقييم التكويني | 5 بنود × 4 درجات | 20 | → من 2 |
+| **periodic** — التقويم المرحلي | 15 مؤشراً × 4 درجات | 60 | → من 30 (÷45×30) |
+| **final** — التقويم الختامي | 7–10 بنود بدرجتين | 50 | — |
 
-When you're ready, run:
+### التغطية
+
+| المرحلة | المقررات الموثّقة |
+|---|---|
+| الصف الرابع الابتدائي | أساسيات الرسم · الفنون البصرية السعودية · الرسم الكرتوني · الأشغال اليدوية |
+| الصف الخامس الابتدائي | أساسيات الرسم · الرسم الكرتوني · الألوان المائية · الفنون البصرية السعودية |
+| الأول المتوسط | أساسيات الرسم · الفنون البصرية السعودية · تصميم الشخصيات · الرسم الرقمي |
+| الثاني المتوسط | أساسيات الرسم · الألوان المائية · الفنون البصرية السعودية · الرسم الرقمي |
+
+**الوراثة:** `grade_int2` يرث `grade_int1`، و `grade5` يرث `grade4`.
+المعرّف القديم `intermediate1` يُعامَل كـ `grade_int1`.
+
+### تنبيهات بيانات معروفة
+
+خمس استمارات ختامية في الوثائق الأصلية مجموع بنودها لا يساوي 50
+(49 / 48 / 44). التطبيق **لا يعدّل القيم** — يعرض تنبيهاً للمعلم عند فتح
+الاستمارة، ويعتمد **مجموع البنود الفعلي** في الحساب حتى لا تظهر درجة متناقضة.
+
+---
+
+## التشغيل
 
 ```bash
-npm run reset-project
+npm install
+npm run verify      # فحص البيانات (يجب أن ينجح)
+npm run typecheck   # فحص الأنواع
+npm start           # تشغيل
+npm run android     # فتح على Android
+npm run ios         # فتح على iOS
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### البناء للنشر (بدون Xcode / Android Studio)
 
-## Learn more
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest build:configure
+npx eas-cli@latest build --platform android
+npx eas-cli@latest build --platform ios
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+المعرّفات المستخدمة:
+- Android: `com.attendance.arts.v2`
+- iOS: `com.attendance.arts.v2`
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## المزامنة مع سيرفر (اختياري)
 
-Join our community of developers creating universal apps.
+التطبيق يعمل محلياً بالكامل دون أي إعداد. للمزامنة:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. أنشئ مشروعاً في [Supabase](https://supabase.com)
+2. نفّذ [`supabase/schema.sql`](supabase/schema.sql) في SQL Editor
+3. انسخ `.env.example` إلى `.env` واملأ المفاتيح:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
+
+4. فعّل المزامنة من **الإعدادات** داخل التطبيق
+
+### كيف تعمل المزامنة
+
+- كل عملية تُحفظ في `AsyncStorage` **فوراً** ثم تُضاف إلى طابور
+- عند طلب المزامنة: يُرفع الطابور، ثم يُسحب ما هو جديد على السيرفر
+- انقطاع الإنترنت لا يمنع العمل — تُرفع التغييرات لاحقاً
+- جدول students مربوط بـ evaluations بـ `ON DELETE CASCADE`
+
+---
+
+## بنية المشروع
+
+```
+constants/
+  theme.ts             نظام التصميم (ألوان، مسافات، ظلال)
+  criteria.data.ts     ★ 532 بند التقييم الرسمية (مُولَّد آلياً)
+  criteria.ts          محرّك الاختيار + القواعد الرسمية للحساب
+lib/
+  store.ts             طبقة البيانات (محلي + مزامنة)
+  session.tsx          حالة مسار التقييم
+  warnings.ts          تنبيهات جودة البيانات
+components/
+  ui.tsx               Button · Card · Badge · Banner · Progress …
+  PasswordDialog.tsx   حوار كلمة المرور (يعمل على iOS و Android)
+app/
+  _layout.tsx          الهيكل + فرض RTL + تحميل الخطوط
+  (tabs)/index.tsx     مسار التقييم: مرحلة ← مقرر ← نوع ← طلاب
+  (tabs)/students.tsx  إدارة الطلاب
+  (tabs)/records.tsx   سجل التقييمات
+  (tabs)/settings.tsx  الإعدادات + النسخ الاحتياطي
+  evaluate.tsx         استمارة التقييم
+  student/[id].tsx     ملف الطالب
+  print.tsx            معاينة + توليد PDF
+scripts/verify.ts      فحص شامل للبيانات
+supabase/schema.sql    مخطط قاعدة البيانات
+```
+
+---
+
+## أوضاع العمل
+
+| الوضع | السلوك |
+|---|---|
+| **عرض** (افتراضي) | يمكن تصفح التقييمات وطباعتها فقط |
+| **تعديل** | يتطلب كلمة المرور — يتيح الحفظ والتعديل والحذف |
+
+كلمة المرور: `01020` (نفس كلمة التطبيق الأصلي)
+
+---
+
+## اختصارات
+
+```bash
+npm run verify      # 7 مجموعات فحوص على البيانات
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint
+npm run doctor      # expo-doctor (18 فحصاً)
+```

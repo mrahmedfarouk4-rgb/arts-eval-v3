@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>٢ · منصة الجودة — Compliance & Workflow</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;direction:rtl;background:#F4F6F9;color:#1C2733}
+.wrap{padding:24px;min-height:100vh}
+.cap{color:#0F2837;font-size:13px;font-weight:700;margin-bottom:16px}
+.cap span{color:#707080;font-weight:400;font-size:11px;margin-right:8px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px}
+.kpi .v{font-size:28px;font-weight:800;color:#0F2837}
+.kpi .u{font-size:10.5px;color:#707080;margin-top:2px}
+.flow{display:flex;gap:12px;margin-bottom:16px;overflow-x:auto}
+.step{flex:0 0 200px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;position:relative}
+.step:not(:last-child)::after{content:"";position:absolute;top:50%;left:-6px;width:12px;height:2px;background:#E2E8F0}
+.step.active{border-color:#0F2837;box-shadow:0 0 0 2px rgba(15,40,55,.15)}
+.step .num{width:28px;height:28px;border-radius:50%;background:#E2E8F0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:#707080;margin:0 auto 8px}
+.step.active .num{background:#0F2837;color:#fff}
+.step .sla{font-size:10px;color:#707080;text-align:center;margin-top:6px}
+.card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
+.card.hd{padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between}
+.card.hd h3{font-size:13px;font-weight:700;color:#0F2837}
+.task{padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:flex-start;gap:12px}
+.task:last-child{border:0}
+.task .cb{width:20px;height:20px;border-radius:5px;border:1.8px solid #CBD5E1;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff}
+.task .cb.on{background:#0F2837;border-color:#0F2837}
+.task .tx{flex:1}
+.task .tx b{font-size:13px;display:block}
+.task .tx small{font-size:11px;color:#707080;display:block;margin-top:2px}
+.task .sl{font-size:10px;color:#707080;background:#F5F6F8;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.comp{padding:16px}
+.comp .row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.comp .bar{flex:1;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden}
+.comp .bar i{display:block;height:100%;background:#0F2837;border-radius:4px}
+.comp .bar i.ok{background:#1B7A42}
+.comp .bar i.warn{background:#FBE122}
+.comp .lbl{width:160px;font-size:12px;color:#41546B}
+.comp .val{width:50px;font-size:11px;color:#707080;text-align:left}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="cap">٢ · منصة الجودة <span>Compliance & Workflow Engine — للجودة / التدقيق / الإدارة القانونية</span></div>
+  <div class="grid">
+    <div class="kpi"><div class="v">٢٣</div><div class="u">مهمة معلقة</div></div>
+    <div class="kpi"><div class="v">٩٨٪</div><div class="u">الالتزام بـ SLA</div></div>
+    <div class="kpi"><div class="v">٢</div><div class="u">استمارة بدون توقيع</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card hd"><h3>سير العمل المعتمد — التقييم التكويني</h3></div>
+    <div class="flow">
+      <div class="step active"><div class="num">١</div><b style="display:block;text-align:center;margin-bottom:4px">التخطيط</div><small>المعلم يضع خطة التقييم</div><div class="sla">SLA: ٣ أيام</div></div>
+      <div class="step"><div class="num">٢</div><b style="display:block;text-align:center;margin-bottom:4px">التنفيذ</div><small>المعلم ينفذ الرصد</div><div class="sla">SLA: ٥ أيام</div></div>
+      <div class="step"><div class="num">٣</div><b style="display:block;text-align:center;margin-bottom:4px">المراجعة</div><small>المشرف يراجع</div><div class="sla">SLA: ٢ أيام</div></div>
+      <div class="step"><div class="num">٤</div><b style="display:block;text-align:center;margin-bottom:4px">الاعتماد</div><small>المدير يعتمد</div><div class="sla">SLA: ١ يوم</div></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card" style="height:420px">
+      <div class="card hd"><h3>مهامي المعلقة (My Tasks)</h3><span style="font-size:11px;color:#007886">تصفية</span></div>
+      <div style="max-height:340px;overflow-y:auto">
+        <div class="task"><span class="cb"></span><div class="tx"><b>اعتماد تقييم سلمان · أساسيات الرسم</b><small>المعلم: ماهر الحربي · تكويني · وحدة ٢</small></div><span class="sl">متبقٍ ١ يوم</span></div>
+        <div class="task"><span class="cb"></span><div class="tx"><b>مراجعة خطة الفصل الثاني</b><small>١٢ معلم لم يرسلوا خطتهم · الموعد غداً</small></div><span class="sl">متبقٍ ١ يوم</span></div>
+        <div class="task"><span class="cb"></span><div class="tx"><b>تدقيق استمارات «الألوان المائية»</b><small>٣ استمارات ناقصة التوقيع</small></div><span class="sl">متأخر ٢ يوم</span></div>
+        <div class="task"><span class="cb"></span><div class="tx"><b>إعداد تقرير ربع سنوي</b><small>موعد التسليم: ٣ أيام</small></div><span class="sl">متبقٍ ٣ أيام</span></div>
+        <div class="task"><span class="cb"></span><div class="tx"><b>مراجعة تقييم «الفنون السعودية»</b><small>٥ استمارات · مشرف: عبدالله الحربي</small></div><span class="sl">متبقٍ ٢ يوم</span></div>
+        <div class="task"><span class="cb"></span><div class="tx"><b>اعتماد تقييم ريم · الرسم الرقمي</b><small>مرحلي · ٣ طلاب · مشرف: سارة العتيبي</small></div><span class="sl">متبقٍ ٢ يوم</span></div>
+      </div>
+    </div>
+    <div class="card" style="height:420px">
+      <div class="card hd"><h3>الامتثال (Compliance)</h3></div>
+      <div class="comp">
+        <div class="row"><span class="lbl">استمارات موقعة رقمياً</span><div class="bar"><i class="ok" style="width:100%"></i></div><span class="val">١٠٠٪</span></div>
+        <div class="row"><span class="lbl">الالتزام بمواعيد SLA</span><div class="bar"><i class="ok" style="width:98%"></i></div><span class="val">٩٨٪</span></div>
+        <div class="row"><span class="lbl">استمارات مكتملة البيانات</span><div class="bar"><i class="ok" style="width:96%"></i></div><span class="val">٩٦٪</span></div>
+        <div class="row"><span class="lbl">استمارات بدون توقيع المشرف</span><div class="bar"><i class="warn" style="width:2%"></i></div><span class="val">٢ استمارة</span></div>
+        <div class="row"><span class="lbl">سجل التدقيق (Audit Trail)</span><div class="bar"><i style="width:100%"></i></div><span class="val">كامل</span></div>
+      </div>
+      <div style="padding:16px;border-top:1px solid #E2E8F0">
+        <div style="font-size:11px;color:#707080;line-height:1.8">
+          <b>سجل التدقيق (Audit Trail):</b> كامل · بصيغة PDF/A-2b · قابل للتصدير للجهاز المركزي للمحاسبات<br>
+          <b>التوقيع الرقمي:</b> PKI معتمد · طوابع وقت معتمدة · شهادة SSL/TLS 1.3<br>
+          <b>النسخ الاحتياطي:</b> يومي · مشفر AES-256 · مخزن في موقعين جغرافيين
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>
