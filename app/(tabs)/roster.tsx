@@ -151,17 +151,18 @@ export default function RosterScreen() {
           />
         ) : (
           <View style={{ gap: sp.sm }}>
-            {filtered.map((stu) => {
+            {filtered.map((stu, i) => {
               const forms = plans[stu.id] ?? [];
               const open = openId === stu.id;
               const doneCount = forms.filter((f) => Object.keys(f.scores ?? {}).length > 0).length;
+              const rowColor = [c.primary, c.brandSecondary, c.orange, c.mint, c.blueMid, c.pinkMid, c.peach][i % 7];
 
               return (
                 <Card key={stu.id} padding={0}>
                   {/* رأس الطالب */}
                   <Pressable
                     onPress={() => setOpenId(open ? null : stu.id)}
-                    style={({ pressed }) => [s.head, pressed && { opacity: 0.8 }]}
+                    style={({ pressed }) => [s.head, { borderLeftWidth: 4, borderLeftColor: rowColor }, pressed && { opacity: 0.8 }]}
                     accessibilityRole="button"
                     accessibilityState={{ expanded: open }}
                   >

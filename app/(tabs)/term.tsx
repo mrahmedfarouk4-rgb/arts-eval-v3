@@ -159,7 +159,7 @@ export default function TermScreen() {
                 <Animated.View key={sid} entering={FadeInDown.delay(340 + i * 50).duration(450)}>
                   <Pressable
                     onPress={() => pickSubject(sid)}
-                    style={({ pressed }) => [s.subjectCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]}
+                    style={({ pressed }) => [s.subjectCard, { backgroundColor: rowColor + '16' }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]}
                     accessibilityRole="button"
                   >
                     <View style={[s.subjectAccent, { backgroundColor: rowColor }]} />
@@ -236,7 +236,7 @@ const s = StyleSheet.create({
   /* Subject cards */
   subjectCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.tileBorder, padding: sp.md, overflow: 'hidden',
     shadowColor: c.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 },
-  subjectAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg },
+  subjectAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg },
   subjectIc: { width: 40, height: 40, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
   subjectName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
   subjectMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },

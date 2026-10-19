@@ -88,6 +88,7 @@ export default function KindScreen() {
                 onPress={() => pickKind(k.id)}
                 padding={sp.lg}
                 accent={t.c}
+                style={{ backgroundColor: t.bg }}
               >
                 <View style={s.row}>
                   <View style={[s.icon, { backgroundColor: t.bg }]}>

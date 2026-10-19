@@ -849,7 +849,7 @@ const styles = StyleSheet.create({
     shadowRadius: 30,
     elevation: 4,
   },
-  accent: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 3 },
+  accent: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 5 },
 
   badge: {
     alignSelf: 'flex-start',

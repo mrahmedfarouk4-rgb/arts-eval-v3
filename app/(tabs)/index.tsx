@@ -198,7 +198,7 @@ export default function GradesScreen() {
             const color = GRADE_COLORS[i % GRADE_COLORS.length];
             return (
               <Animated.View key={g.id} entering={FadeInDown.delay(420 + i * 60).duration(500)}>
-                <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
+                <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, { backgroundColor: color + '18' }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
                   <View style={[s.gradeAccent, { backgroundColor: color }]} />
                   <View style={[s.gradeIc, { backgroundColor: color + '18' }]}>
                     <Ionicons name="school-outline" size={18} color={color} />
@@ -232,26 +232,6 @@ export default function GradesScreen() {
           </View>
         </Animated.View>
 
-        {/* ===== Gallery ===== */}
-        <Animated.View entering={FadeInDown.delay(560).duration(500)}>
-          <Text style={s.sectionTitle}>معرض — الفنون البصرية</Text>
-          <View style={s.galleryGrid}>
-            {[
-              { img: require('@/assets/brand/bg-warm-light.jpg'), label: 'رسم' },
-              { img: require('@/assets/brand/bg-cool-light.jpg'), label: 'تلوين' },
-              { img: require('@/assets/brand/bg-warm-mid.jpg'), label: 'خط' },
-              { img: require('@/assets/brand/bg-deep-dark.jpg'), label: 'تصميم' },
-              { img: require('@/assets/brand/bg-warm-mid2.jpg'), label: 'نحت' },
-              { img: require('@/assets/brand/bg-main.jpg'), label: 'تصوير' },
-            ].map((g) => (
-              <View key={g.label} style={s.galleryItem}>
-                <Image source={g.img} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.45)']} style={StyleSheet.absoluteFill} />
-                <Text style={s.galleryLabel}>{g.label}</Text>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
 
         {/* ===== FAQ ===== */}
         <Animated.View entering={FadeInDown.delay(600).duration(500)}>
@@ -353,7 +333,7 @@ const s = StyleSheet.create({
   /* Grade rows */
   gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.tileBorder, padding: sp.md, overflow: 'hidden',
     shadowColor: c.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 },
-  gradeAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg },
+  gradeAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg },
   gradeIc: { width: 42, height: 42, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
   gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
   gradeMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
