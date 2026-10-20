@@ -125,11 +125,11 @@ export default function TermScreen() {
                 <Pressable
                   key={t.id}
                   onPress={() => setTerm(t.id)}
-                  style={({ pressed }) => [s.termChip, on && { backgroundColor: gColor, borderColor: gColor }, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
+                  style={({ pressed }) => [s.termChip, { borderColor: gColor }, on && { backgroundColor: gColor, shadowOpacity: 0.2, elevation: 3 }, !on && { backgroundColor: gColor + '1A' }, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
                   accessibilityRole="button"
                 >
-                  <Text style={[s.termText, on && s.termTextOn]}>{t.name}</Text>
-                  <Text style={[s.termSub, on && s.termSubOn]}>{t.id === 'term1' ? 'الفصل الأول' : 'الفصل الثاني'}</Text>
+                  <Text style={[s.termText, !on && { color: gColor }, on && s.termTextOn]}>{t.name}</Text>
+                  <Text style={[s.termSub, !on && { color: gColor + 'AA' }, on && s.termSubOn]}>{t.id === 'term1' ? 'الفصل الأول' : 'الفصل الثاني'}</Text>
                   {on && (
                     <View style={s.termCheck}>
                       <Ionicons name="checkmark" size={12} color="#FFFFFF" />
@@ -159,19 +159,19 @@ export default function TermScreen() {
                 <Animated.View key={sid} entering={FadeInDown.delay(340 + i * 50).duration(450)}>
                   <Pressable
                     onPress={() => pickSubject(sid)}
-                    style={({ pressed }) => [s.subjectCard, { backgroundColor: rowColor + '16' }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]}
+                    style={({ pressed }) => [s.subjectCard, { backgroundColor: rowColor }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]}
                     accessibilityRole="button"
                   >
-                    <View style={[s.subjectAccent, { backgroundColor: rowColor }]} />
-                    <View style={[s.subjectIc, { backgroundColor: rowColor + '18' }]}>
-                      <Ionicons name="book-outline" size={17} color={rowColor} />
+                    <View style={s.subjectAccent} />
+                    <View style={s.subjectIc}>
+                      <Ionicons name="book-outline" size={17} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.subjectName}>{subjectName(sid)}</Text>
                       <Text style={s.subjectMeta}>جاهز للتقييم</Text>
                     </View>
-                    <View style={[s.subjectArrow, { backgroundColor: rowColor + '14' }]}>
-                      <Ionicons name="chevron-back" size={16} color={rowColor} />
+                    <View style={s.subjectArrowLeft}>
+                      <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
                     </View>
                   </Pressable>
                 </Animated.View>
@@ -224,8 +224,8 @@ const s = StyleSheet.create({
 
   /* Term chips */
   termRow: { flexDirection: 'row', gap: sp.sm },
-  termChip: { flex: 1, paddingVertical: sp.md, paddingHorizontal: sp.md, borderRadius: rad.lg, backgroundColor: c.tileBg, borderWidth: 1, borderColor: c.tileBorder, gap: 2,
-    shadowColor: c.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 },
+  termChip: { flex: 1, paddingVertical: sp.md, paddingHorizontal: sp.md, borderRadius: rad.lg, gap: 2,
+    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 1 },
   termChipOn: {},
   termText: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text2 },
   termTextOn: { color: c.onPrimary, fontFamily: fnt.b },
@@ -234,13 +234,14 @@ const s = StyleSheet.create({
   termCheck: { position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
 
   /* Subject cards */
-  subjectCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.tileBorder, padding: sp.md, overflow: 'hidden',
-    shadowColor: c.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 },
-  subjectAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg },
-  subjectIc: { width: 40, height: 40, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
-  subjectName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
-  subjectMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
+  subjectCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
+    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+  subjectAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg, backgroundColor: 'rgba(255,255,255,0.35)' },
+  subjectIc: { width: 40, height: 40, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
+  subjectName: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
+  subjectMeta: { fontFamily: fnt.r, fontSize: 10.5, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
   subjectArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  subjectArrowLeft: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
 
   emptyAssigned: { backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.line, padding: sp.lg, alignItems: 'center', gap: sp.sm },
   assignedText: { fontFamily: fnt.m, fontSize: fs.sm, color: c.text2, lineHeight: 21, textAlign: 'center' },

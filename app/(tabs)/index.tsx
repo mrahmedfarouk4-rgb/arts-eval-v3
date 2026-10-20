@@ -113,11 +113,16 @@ export default function GradesScreen() {
         {/* ===== Hero ===== */}
         <Animated.View entering={FadeIn.duration(700)} style={s.hero}>
           <Image source={require('@/assets/brand/bg-teal-dark.jpg')} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-          <LinearGradient colors={['rgba(0,70,69,0.25)', 'rgba(0,70,69,0.92)']} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(0,70,69,0.20)', 'rgba(0,70,69,0.95)']} style={StyleSheet.absoluteFill} />
           <View style={s.heroContent}>
-            <Text style={s.heroEyebrow}>أكاديمية آفاق · الفنون البصرية</Text>
-            <Text style={s.heroTitle}>تقييم.{'\n'}إبداع.{'\n'}تألق.</Text>
-            <Text style={s.heroSub}>لوحة عمل المعلّم — كل ما تحتاجه بنظرة</Text>
+            <View style={s.heroTop}>
+              <Text style={s.heroEyebrow}>أكاديمية آفاق · الفنون البصرية</Text>
+              <Text style={s.heroEyebrowEn}>AFAC — Fine Arts & Culture</Text>
+            </View>
+            <Text style={s.heroTitle}>تقييم.</Text>
+            <Text style={s.heroTitle}>إبداع.</Text>
+            <Text style={s.heroTitle}>تألق.</Text>
+            <Text style={s.heroSub}>لوحة عمل المعلّم — كل ما تحتاجه بنظرة واحدة</Text>
             <View style={s.heroStats}>
               <View style={s.heroStat}>
                 <Text style={s.heroStatValue}>{ar(students)}</Text>
@@ -147,11 +152,11 @@ export default function GradesScreen() {
           <Text style={s.sectionTitle}>ابدأ بسرعة</Text>
           <View style={s.actionGrid}>
             {ACTIONS.map((a, i) => (
-              <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [s.actionCard, { backgroundColor: a.color }, pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 }]} accessibilityRole="button">
-                <View style={s.actionIconWrap}>
+              <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [s.actionCardSolid, { backgroundColor: a.color }, pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 }]} accessibilityRole="button">
+                <View style={s.actionIconWrapSolid}>
                   <Ionicons name={a.icon as any} size={22} color="#FFFFFF" />
                 </View>
-                <Text style={s.actionLabel}>{a.label}</Text>
+                <Text style={s.actionLabelSolid}>{a.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -198,17 +203,17 @@ export default function GradesScreen() {
             const color = GRADE_COLORS[i % GRADE_COLORS.length];
             return (
               <Animated.View key={g.id} entering={FadeInDown.delay(420 + i * 60).duration(500)}>
-                <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, { backgroundColor: color + '18' }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
-                  <View style={[s.gradeAccent, { backgroundColor: color }]} />
-                  <View style={[s.gradeIc, { backgroundColor: color + '18' }]}>
-                    <Ionicons name="school-outline" size={18} color={color} />
+                <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, { backgroundColor: color }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
+                  <View style={s.gradeAccent} />
+                  <View style={s.gradeIc}>
+                    <Ionicons name="school-outline" size={18} color="#FFFFFF" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.gradeName}>{gradeName(g.id)}</Text>
                     <Text style={s.gradeMeta}>ف١ · {ar(n1)} مقررات · ف٢ · {ar(n2)} مقررات</Text>
                   </View>
-                  <View style={[s.gradeArrow, { backgroundColor: color + '14' }]}>
-                    <Ionicons name="chevron-back" size={16} color={color} />
+                  <View style={s.gradeArrow}>
+                    <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
                   </View>
                 </Pressable>
               </Animated.View>
@@ -295,7 +300,9 @@ const s = StyleSheet.create({
   hero: { height: 230, borderRadius: rad.xl, overflow: 'hidden', marginBottom: sp.xs,
     shadowColor: c.primary, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 28, elevation: 8 },
   heroContent: { flex: 1, padding: sp.lg, justifyContent: 'space-between' },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
   heroEyebrow: { fontFamily: fnt.m, fontSize: 10.5, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 },
+  heroEyebrowEn: { fontFamily: fnt.m, fontSize: 9.5, color: 'rgba(255,255,255,0.7)', marginLeft: sp.xs },
   heroTitle: { fontFamily: fnt.bk, fontSize: 40, color: '#FFFFFF', letterSpacing: -1, lineHeight: 42, marginTop: 4 },
   heroSub: { fontFamily: fnt.r, fontSize: fs.xs, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
   heroStats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: rad.md, paddingVertical: sp.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', marginTop: sp.sm },
@@ -308,10 +315,10 @@ const s = StyleSheet.create({
 
   /* Quick actions grid */
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
-  actionCard: { width: '47.6%', borderRadius: rad.lg, padding: sp.md, gap: sp.sm, flexDirection: 'row', alignItems: 'center',
-    shadowColor: c.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 4 },
-  actionIconWrap: { width: 40, height: 40, borderRadius: rad.md, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF', flex: 1 },
+  actionCardSolid: { width: '47.6%', borderRadius: rad.lg, padding: sp.md, gap: sp.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: c.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.20, shadowRadius: 16, elevation: 5 },
+  actionIconWrapSolid: { width: 42, height: 42, borderRadius: rad.md, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' },
+  actionLabelSolid: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
 
   row: { flexDirection: 'row', gap: sp.md },
   big: { fontFamily: fnt.bk, fontSize: 30, color: c.primary, letterSpacing: -0.8, lineHeight: 34 },
@@ -331,13 +338,13 @@ const s = StyleSheet.create({
   stepDesc: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3 },
 
   /* Grade rows */
-  gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.tileBorder, padding: sp.md, overflow: 'hidden',
-    shadowColor: c.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 },
-  gradeAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg },
-  gradeIc: { width: 42, height: 42, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
-  gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
-  gradeMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
-  gradeArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
+    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+  gradeAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg, backgroundColor: 'rgba(255,255,255,0.35)' },
+  gradeIc: { width: 42, height: 42, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
+  gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
+  gradeMeta: { fontFamily: fnt.r, fontSize: 10.5, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+  gradeArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
 
   /* CTA banner */
   ctaBanner: { height: 170, borderRadius: rad.xl, overflow: 'hidden', marginTop: sp.sm,
