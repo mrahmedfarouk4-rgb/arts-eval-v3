@@ -354,12 +354,19 @@ export const ORG = {
 
 export const GRADE_COLORS = ['#004645', '#621244', '#83C3EB', '#D17E30', '#83D5C4', '#E5A1C8'] as const;
 
-const GRADE_ORDER = ['primary4', 'primary5', 'primary6', 'intermediate1', 'intermediate2', 'intermediate3'];
+const GRADE_MAP: Record<string, string> = {
+  grade4: '#004645',
+  grade5: '#621244',
+  grade_int1: '#83C3EB',
+  intermediate1: '#83C3EB',
+  grade_int2: '#D17E30',
+  intermediate2: '#D17E30',
+};
 
 export function gradeColor(gradeId: string): string {
-  const idx = GRADE_ORDER.indexOf(gradeId);
-  return GRADE_COLORS[idx >= 0 ? idx : 0];
+  return GRADE_MAP[gradeId] ?? '#004645';
 }
+
 
 export const SUBJECT_COLORS: Record<string, string> = {
   drawing_basics: '#83D5C4',   // تركواز (Mint)

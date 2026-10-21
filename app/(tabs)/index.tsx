@@ -203,17 +203,17 @@ export default function GradesScreen() {
             const color = GRADE_COLORS[i % GRADE_COLORS.length];
             return (
               <Animated.View key={g.id} entering={FadeInDown.delay(420 + i * 60).duration(500)}>
-                <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, { backgroundColor: color }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
-                  <View style={s.gradeAccent} />
-                  <View style={s.gradeIc}>
-                    <Ionicons name="school-outline" size={18} color="#FFFFFF" />
+                <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
+                  <View style={[s.gradeAccent, { backgroundColor: color }]} />
+                  <View style={[s.gradeIc, { backgroundColor: color + '18' }]}>
+                    <Ionicons name="school-outline" size={18} color={color} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.gradeName}>{gradeName(g.id)}</Text>
                     <Text style={s.gradeMeta}>ف١ · {ar(n1)} مقررات · ف٢ · {ar(n2)} مقررات</Text>
                   </View>
-                  <View style={s.gradeArrow}>
-                    <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
+                  <View style={[s.gradeArrow, { backgroundColor: color + '14' }]}>
+                    <Ionicons name="chevron-back" size={16} color={color} />
                   </View>
                 </Pressable>
               </Animated.View>
@@ -338,13 +338,13 @@ const s = StyleSheet.create({
   stepDesc: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3 },
 
   /* Grade rows */
-  gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
-    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
-  gradeAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg, backgroundColor: 'rgba(255,255,255,0.35)' },
-  gradeIc: { width: 42, height: 42, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
-  gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
-  gradeMeta: { fontFamily: fnt.r, fontSize: 10.5, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
-  gradeArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
+  gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden', backgroundColor: '#FFFFFF',
+    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: c.line },
+  gradeAccent: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 6, borderTopRightRadius: rad.lg, borderBottomRightRadius: rad.lg },
+  gradeIc: { width: 42, height: 42, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
+  gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
+  gradeMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
+  gradeArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
 
   /* CTA banner */
   ctaBanner: { height: 170, borderRadius: rad.xl, overflow: 'hidden', marginTop: sp.sm,

@@ -108,6 +108,7 @@ export default function EvaluateScreen() {
   const missing = n - ratedCount;
   const isFinal = kind === 'final';
   const tone = kindTone[kind];
+  const subColor = subjectColor(subjectId);
 
   /** عدد البنود في كل مستوى — لمخطط الملخص */
   const dist = useMemo(
@@ -311,24 +312,24 @@ export default function EvaluateScreen() {
   /* ================= العرض ================= */
   return (
     <SafeAreaView style={s.root} edges={['top', 'bottom']}>
-      {/* ================= الترويسة الثابتة ================= */}
-      <View style={[s.head, { borderBottomColor: subjectColor(subjectId), borderBottomWidth: 2 }]}>
+      {/* ================= الترويسة الثابتة باللون المميز ================= */}
+      <View style={[s.head, { backgroundColor: subColor }]}>
         <View style={s.headRow}>
-          <Pressable onPress={goBack} hitSlop={10} style={s.headBtn} accessibilityLabel="رجوع">
-            <Ionicons name="chevron-forward" size={19} color={c.text} />
+          <Pressable onPress={goBack} hitSlop={10} style={s.headBtnSolid} accessibilityLabel="رجوع">
+            <Ionicons name="chevron-forward" size={19} color="#FFFFFF" />
           </Pressable>
 
           <View style={{ flex: 1 }}>
-            <Text style={s.headName} numberOfLines={1}>{studentName || 'تقييم'}</Text>
-            <Text style={s.headMeta} numberOfLines={1}>
+            <Text style={s.headNameSolid} numberOfLines={1}>{studentName || 'تقييم'}</Text>
+            <Text style={s.headMetaSolid} numberOfLines={1}>
               {gradeName(gradeId)} · {subjectName(subjectId)} · {kindMeta(kind).name}
             </Text>
           </View>
 
-          <View style={[s.scoreChip, { backgroundColor: tone.bg }]}>
-            <Text style={[s.scoreVal, { color: tone.c }]}>
+          <View style={s.scoreChipSolid}>
+            <Text style={[s.scoreValSolid, { color: subColor }]}>
               {score}
-              <Text style={s.scoreMax}>/{totals.actualMax}</Text>
+              <Text style={s.scoreMaxSolid}>/{totals.actualMax}</Text>
             </Text>
           </View>
 
@@ -336,42 +337,43 @@ export default function EvaluateScreen() {
             onPress={() => setMetaOpen((v) => !v)}
             hitSlop={10}
             style={[
-              s.headBtn,
-              metaOpen && { backgroundColor: c.primaryBg, borderColor: c.primaryLine },
+              s.headBtnSolid,
+              metaOpen && { backgroundColor: '#FFFFFF' },
             ]}
             accessibilityLabel="بيانات الاستمارة"
           >
             <Ionicons
               name={metaOpen ? 'chevron-up' : 'ellipsis-vertical'}
               size={17}
-              color={metaOpen ? c.primary : c.text2}
+              color={metaOpen ? subColor : '#FFFFFF'}
             />
           </Pressable>
         </View>
 
         {/* التقدّم */}
         <View style={s.progRow}>
-          <Text style={s.progText}>
+          <Text style={s.progTextSolid}>
             {ratedCount} / {n} بند
           </Text>
           <View style={s.progSide}>
             {level ? (
-              <Text style={s.progLevel} numberOfLines={1}>
-                {level.label}
-              </Text>
+              <View style={s.progLevelBadge}>
+                <Text style={s.progLevelSolid} numberOfLines={1}>
+                  {level.label}
+                </Text>
+              </View>
             ) : (
-              <Text style={s.progNone}>لم يُقيَّم</Text>
+              <Text style={s.progNoneSolid}>لم يُقيَّم</Text>
             )}
-            {/* مبدّل وضع التعديل — لازم على شاشة التقييم نفسها، وإلا
-                استحال الحفظ والطباعة منها إطلاقاً. */}
+            {/* مبدّل وضع التعديل */}
             <ModeToggle />
           </View>
         </View>
         <Progress
           value={ratedCount}
           max={n}
-          color={level ? level.color : tone.c}
-          height={5}
+          color="#FFFFFF"
+          height={6}
         />
       </View>
 
@@ -502,6 +504,48 @@ export default function EvaluateScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ================= شريط الأدوات السريع ================= */}
+          {editMode && (
+            <View style={s.quickBar}>
+              <Pressable
+                onPress={() => fillRemaining(4)}
+                style={({ pressed }) => [
+                  s.quickBtn,
+                  { backgroundColor: scaleTone[3] },
+                  pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+                ]}
+              >
+                <Ionicons name="sparkles" size={13} color="#FFFFFF" />
+                <Text style={s.quickBtnText}>تعبئة يتخطى (٤)</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => fillRemaining(3)}
+                style={({ pressed }) => [
+                  s.quickBtn,
+                  { backgroundColor: scaleTone[2] },
+                  pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+                ]}
+              >
+                <Ionicons name="checkmark-done" size={13} color="#FFFFFF" />
+                <Text style={s.quickBtnText}>تعبئة حقق (٣)</Text>
+              </Pressable>
+
+              {ratedCount > 0 && (
+                <Pressable
+                  onPress={clearAll}
+                  style={({ pressed }) => [
+                    s.quickBtnClear,
+                    pressed && { opacity: 0.75 },
+                  ]}
+                >
+                  <Ionicons name="refresh-outline" size={13} color={c.err} />
+                  <Text style={s.quickBtnClearText}>مسح</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+
           {/* ترويسة الجدول */}
           <View style={s.tableHead}>
             <Text style={s.tableHeadTitle}>بنود التقييم</Text>
@@ -785,11 +829,25 @@ const s = StyleSheet.create({
     backgroundColor: c.bgLift, borderWidth: 1, borderColor: c.line,
     alignItems: 'center', justifyContent: 'center',
   },
+  headBtnSolid: {
+    width: 36, height: 36, borderRadius: rad.sm,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   headName: { fontFamily: fnt.b, fontSize: fs.md, color: c.text },
+  headNameSolid: { fontFamily: fnt.b, fontSize: fs.md, color: '#FFFFFF' },
   headMeta: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3, marginTop: 2 },
+  headMetaSolid: { fontFamily: fnt.m, fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
   scoreChip: { borderRadius: rad.sm, paddingHorizontal: sp.md, paddingVertical: 6 },
+  scoreChipSolid: {
+    borderRadius: rad.md, paddingHorizontal: sp.md, paddingVertical: 5,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 2,
+  },
   scoreVal: { fontFamily: fnt.bk, fontSize: fs.md },
+  scoreValSolid: { fontFamily: fnt.bk, fontSize: fs.md },
   scoreMax: { fontFamily: fnt.b, fontSize: fs.xs },
+  scoreMaxSolid: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text3 },
 
   progRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   progSide: {
@@ -797,8 +855,36 @@ const s = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   progText: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text2 },
+  progTextSolid: { fontFamily: fnt.b, fontSize: fs.xs, color: '#FFFFFF' },
   progLevel: { fontFamily: fnt.b, fontSize: fs.xxs, color: c.text2 },
+  progLevelBadge: {
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: rad.pill,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  progLevelSolid: { fontFamily: fnt.b, fontSize: fs.xxs, color: '#FFFFFF' },
   progNone: { fontFamily: fnt.r, fontSize: fs.xxs, color: c.text4 },
+  progNoneSolid: { fontFamily: fnt.r, fontSize: fs.xxs, color: 'rgba(255,255,255,0.75)' },
+
+  quickBar: {
+    flexDirection: 'row', alignItems: 'center', gap: sp.xs,
+    paddingHorizontal: sp.lg, paddingVertical: sp.xs,
+    backgroundColor: c.bgAlt, borderBottomWidth: 1, borderBottomColor: c.line,
+    borderRadius: rad.lg,
+  },
+  quickBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: sp.md, paddingVertical: 6,
+    borderRadius: rad.pill,
+  },
+  quickBtnText: { fontFamily: fnt.b, fontSize: 11, color: '#FFFFFF' },
+  quickBtnClear: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: sp.sm, paddingVertical: 5,
+    borderRadius: rad.pill, borderWidth: 1, borderColor: c.err + '40',
+    backgroundColor: c.err + '10',
+    marginLeft: 'auto',
+  },
+  quickBtnClearText: { fontFamily: fnt.m, fontSize: 10.5, color: c.err },
 
   /* اللوح الجانبي */
   metaPanel: {

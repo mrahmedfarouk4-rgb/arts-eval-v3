@@ -82,12 +82,12 @@ export default function TermScreen() {
 
         {/* ===== اسم المعلم (إذا لم يُحفظ) ===== */}
         {!teacherName && (
-          <Animated.View entering={FadeInDown.delay(120).duration(500)} style={s.teacherBox}>
+          <Animated.View entering={FadeInDown.delay(120).duration(500)} style={[s.teacherBox, { backgroundColor: gColor + '16', borderColor: gColor + '55' }]}>
             <View style={s.teacherHead}>
-              <View style={s.teacherIc}>
-                <Ionicons name="person-outline" size={16} color={c.primary} />
+              <View style={[s.teacherIc, { backgroundColor: gColor + '2A' }]}>
+                <Ionicons name="person-outline" size={16} color={gColor} />
               </View>
-              <Text style={s.teacherTitle}>اسم المعلم</Text>
+              <Text style={[s.teacherTitle, { color: gColor }]}>اسم المعلم</Text>
             </View>
             <Text style={s.teacherHint}>أدخل اسمك مرة واحدة — يُستخدم في جميع التقييمات</Text>
             <View style={s.teacherRow}>
@@ -106,7 +106,7 @@ export default function TermScreen() {
                 style={({ pressed }) => [s.saveBtn, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
                 accessibilityRole="button"
               >
-                <LinearGradient colors={[c.primary, c.primaryHi]} style={s.saveBtnGrad}>
+                <LinearGradient colors={[gColor, gColor]} style={s.saveBtnGrad}>
                   <Text style={s.saveBtnText}>حفظ</Text>
                 </LinearGradient>
               </Pressable>
@@ -159,19 +159,19 @@ export default function TermScreen() {
                 <Animated.View key={sid} entering={FadeInDown.delay(340 + i * 50).duration(450)}>
                   <Pressable
                     onPress={() => pickSubject(sid)}
-                    style={({ pressed }) => [s.subjectCard, { backgroundColor: rowColor }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]}
+                    style={({ pressed }) => [s.subjectCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]}
                     accessibilityRole="button"
                   >
-                    <View style={s.subjectAccent} />
-                    <View style={s.subjectIc}>
-                      <Ionicons name="book-outline" size={17} color="#FFFFFF" />
+                    <View style={[s.subjectAccent, { backgroundColor: rowColor }]} />
+                    <View style={[s.subjectIc, { backgroundColor: rowColor + '18' }]}>
+                      <Ionicons name="book-outline" size={17} color={rowColor} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.subjectName}>{subjectName(sid)}</Text>
-                      <Text style={s.subjectMeta}>جاهز للتقييم</Text>
+                      <Text style={[s.subjectName, { color: c.text }]}>{subjectName(sid)}</Text>
+                      <Text style={[s.subjectMeta, { color: c.text3 }]}>جاهز للتقييم</Text>
                     </View>
-                    <View style={s.subjectArrowLeft}>
-                      <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
+                    <View style={[s.subjectArrowLeft, { backgroundColor: rowColor + '14' }]}>
+                      <Ionicons name="chevron-back" size={16} color={rowColor} />
                     </View>
                   </Pressable>
                 </Animated.View>
@@ -183,7 +183,7 @@ export default function TermScreen() {
 
         {/* ===== CTA ===== */}
         <Animated.View entering={FadeInDown.delay(420).duration(500)} style={s.ctaBanner}>
-          <LinearGradient colors={[c.primary, c.primaryHi]} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[gColor, gColor + 'DD']} style={StyleSheet.absoluteFill} />
           <View style={s.ctaBannerContent}>
             <Text style={s.ctaBannerTitle}>جاهز؟</Text>
             <Text style={s.ctaBannerSub}>اختر مقرراً أعلاه للبدء في التقييم</Text>
@@ -234,14 +234,14 @@ const s = StyleSheet.create({
   termCheck: { position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
 
   /* Subject cards */
-  subjectCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
-    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
-  subjectAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, borderTopLeftRadius: rad.lg, borderBottomLeftRadius: rad.lg, backgroundColor: 'rgba(255,255,255,0.35)' },
-  subjectIc: { width: 40, height: 40, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
-  subjectName: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
-  subjectMeta: { fontFamily: fnt.r, fontSize: 10.5, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+  subjectCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden', backgroundColor: '#FFFFFF',
+    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: c.line },
+  subjectAccent: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 6, borderTopRightRadius: rad.lg, borderBottomRightRadius: rad.lg },
+  subjectIc: { width: 40, height: 40, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
+  subjectName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
+  subjectMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
   subjectArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  subjectArrowLeft: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' },
+  subjectArrowLeft: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
 
   emptyAssigned: { backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.line, padding: sp.lg, alignItems: 'center', gap: sp.sm },
   assignedText: { fontFamily: fnt.m, fontSize: fs.sm, color: c.text2, lineHeight: 21, textAlign: 'center' },
