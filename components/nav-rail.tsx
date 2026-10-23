@@ -17,6 +17,7 @@ export const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/', label: 'التقييم', icon: 'clipboard-outline' },
   { href: '/students', label: 'الطلاب', icon: 'people-outline' },
   { href: '/records', label: 'السجل', icon: 'albums-outline' },
+  { href: '/six-weeks', label: '٦ أسابيع', icon: 'document-text-outline' },
   { href: '/settings', label: 'الإعدادات', icon: 'options-outline' },
 ];
 

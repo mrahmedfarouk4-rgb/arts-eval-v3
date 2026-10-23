@@ -150,6 +150,8 @@ export default function RootLayout() {
                     <Stack.Screen name="evaluate" options={{ headerShown: false }} />
                     <Stack.Screen name="student/[id]" options={{ headerShown: false }} />
                     <Stack.Screen name="print" options={{ headerShown: false, presentation: 'modal' }} />
+                    {/* تقرير الستة أسابيع — شاشة تحرير بترويسة خاصة */}
+                    <Stack.Screen name="six-week-report" options={{ headerShown: false }} />
                   </Stack>
                 </SessionProvider>
               </AuthGate>
