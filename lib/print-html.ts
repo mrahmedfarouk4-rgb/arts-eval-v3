@@ -348,7 +348,7 @@ function criteriaTableHtml(row: PrintRow, term: 'term1' | 'term2' | 'all'): stri
     hasNum ? '<col style="width:4%">' : ''
   }<col style="width:${wText}">${wScaleCols
     .map((x) => `<col style="width:${x}">`)
-    .join('')}<col style="width:22%"><col style="width:28%"></colgroup>`;
+    .join('')}</colgroup>`;
 
   /**
    * «مستوى أداء المهارات» — الشريط العلوي لرأس جدول التقييم التكويني.
@@ -371,7 +371,7 @@ function criteriaTableHtml(row: PrintRow, term: 'term1' | 'term2' | 'all'): stri
    * فنستخدم خليةً واحدة بامتداد الجدول كلها، ونرسم الحدّ الفاصل بتدرّج:
    *   ‎navy‎ عند أول `wText%` من اليمين، ثم عنّابي حتى الحافة اليسرى.
    * وبإخفاء الحدّ السفلي تحت عمود البنود (`border-bottom:none`) وبـ
-   * `border-top:none` على خليته، تلتقي الكتلتان الكحليتان بلا خطّ بينهما,
+   * `border-top:none` على خليته، تلتقي الكتلتان الكحليتان بلا خطّ بينهما،
    * فيصير عمود البنود مدمجاً رأسياً كما في الكليشة — والأعمدة مضبوطة.
    */
   const showGroupHead = layout === 'modern' && row.kind === 'weekly';
@@ -387,15 +387,11 @@ function criteriaTableHtml(row: PrintRow, term: 'term1' | 'term2' | 'all'): stri
            ${numHead}
            <th style="width:${wText};background:${C.navy};color:#ffffff;border:${B};border-top:none;padding:3px 7px;text-align:right;font-size:11pt;font-weight:900">${esc(textLabel)}</th>
            ${scaleHead}
-           <th style="width:22%;background:${C.navy};color:#ffffff;border:${B};border-top:none;padding:3px 7px;text-align:center;font-size:11pt;font-weight:900">نسبة التحقق</th>
-           <th style="width:28%;background:${C.navy};color:#ffffff;border:${B};border-top:none;padding:3px 7px;text-align:right;font-size:11pt;font-weight:900">ملاحظات المعلم/ـة</th>
          </tr>`
       : `<tr style="height:9mm">
           ${numHead}
           <th style="width:${wText};background:${C.navy};color:#ffffff;border:${B};padding:3px 7px;text-align:right;font-size:11pt;font-weight:900">${esc(textLabel)}</th>
           ${scaleHead}
-          <th style="width:22%;background:${C.navy};color:#ffffff;border:${B};text-align:center;font-size:11pt;font-weight:900">نسبة التحقق</th>
-          <th style="width:28%;background:${C.navy};color:#ffffff;border:${B};text-align:right;font-size:11pt;font-weight:900">ملاحظات المعلم/ـة</th>
         </tr>`;
 
   const body = t.criteria
@@ -410,31 +406,14 @@ function criteriaTableHtml(row: PrintRow, term: 'term1' | 'term2' | 'all'): stri
            ${markNum(v, `${w[o + 3]}%`)}`
         : SCALE.map((s, i) => mark(v === s.n ? v : undefined, wScaleCols[i])).join('');
 
-      // نسبة التحقق للعمود الجديد
-      const pct = isFinal
-        ? (typeof v === 'number' ? Math.round((v / crit.max) * 100) : 0)
-        : (typeof v === 'number' ? Math.round((v / 4) * 100) : 0);
-
-      const notesCell = `<td style="border:${B};padding:${txtPad};text-align:right;font-size:${txtFs};color:${C.value};line-height:${txtLh};vertical-align:middle;white-space:pre-line"></td>`;
-
-      return `<tr style="height:${rowH}">${numCell(i)}${text}${cells}<td style="border:${B};padding:${txtPad};text-align:center;font-size:${txtFs};color:${C.value};background:${txtBg};vertical-align:middle">${pct > 0 ? ar(pct) : '—'}</td>${notesCell}</tr>`;
+      return `<tr style="height:${rowH}">${numCell(i)}${text}${cells}</tr>`;
     })
     .join('');
-
-  // صف المجموع في أسفل الجدول
-  const totalRowTotal = sumScores(row.evaluation.scores, t.criteria);
-  const totalRow = `<tr style="height:${rowH};background:${C.pinkAlt}">
-    ${hasNum ? `<td style="border:${B};padding:${txtPad};text-align:center;font-weight:900;color:${C.value}"></td>` : ''}
-    <td style="border:${B};padding:${txtPad};text-align:right;font-weight:900;color:${C.value}">المجموع</td>
-    <td style="border:${B};padding:${txtPad};text-align:center;font-weight:900;color:${C.value}" colspan="${wScaleCols.length}"></td>
-    <td style="border:${B};padding:${txtPad};text-align:center;font-weight:900;color:${C.value};background:${txtBg}">${ar(Math.round((totalRowTotal / t.actualMax) * 100))}</td>
-    <td style="border:${B};padding:${txtPad};text-align:right;font-weight:900;color:${C.value}"></td>
-  </tr>`;
 
   return `<table style="width:100%;border-collapse:collapse;direction:rtl;table-layout:fixed;border:1.25pt solid ${C.maroon}">
     ${colgroup}
     <thead>${head}</thead>
-    <tbody>${body}${totalRow}</tbody>
+    <tbody>${body}</tbody>
   </table>`;
 }
 
@@ -512,24 +491,6 @@ function pageHtml(row: PrintRow, term: 'term1' | 'term2' | 'all'): string {
 
   <!-- الملاحظات الرسمية — التقويم الختامي فقط -->
   ${officialNotes}
-
-  <!-- قسم التوقيعات والملاحظات — كما في الورقة الرسمية -->
-  <div style="margin-top:8mm;direction:rtl">
-    <div style="text-align:right;font-size:12pt;font-weight:700;color:${TITLE_INK};margin-bottom:3mm">توقيع المعلم/ـة:</div>
-    <div style="display:flex;justify-content:flex-end;gap:15mm;margin-bottom:8mm">
-      <div style="text-align:right">
-        <div style="border-bottom:0.75pt solid ${C.border};padding-bottom:1mm;width:45mm"></div>
-        <div style="font-size:10pt;color:${C.value};margin-top:1mm">الاسم والتوقيع:</div>
-      </div>
-      <div style="text-align:right">
-        <div style="border-bottom:0.75pt solid ${C.border};padding-bottom:1mm;width:45mm"></div>
-        <div style="font-size:10pt;color:${C.value};margin-top:1mm">التاريخ:</div>
-      </div>
-    </div>
-
-    <div style="text-align:right;font-size:12pt;font-weight:700;color:${TITLE_INK};margin-bottom:3mm">ملاحظات/targets:</div>
-    <div style="border:${B};padding:6mm 8mm;text-align:right;font-size:11pt;color:${C.value};line-height:1.8;background:${C.pinkSoft};min-height:12mm;white-space:pre-line"></div>
-  </div>
 
   <!-- التذييل — كما في الكليشة الرسمية: السطر الأول عريض والشريط الفاتح تحته -->
   <div class="sheet-foot">
