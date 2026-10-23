@@ -572,17 +572,21 @@ export function buildPrintHtml(
   .print-page {
     position: relative;
     width: 210mm;
-    height: 297mm;
-    padding: 11mm 12mm 8mm 14mm;   /* يسار أعرض لتفادي حافة الطباعة */
-    margin: 0 auto 8mm auto;
+    min-height: 297mm;                /* 페이지 تنمو إذا زاد المحتوى، ولا تُقصّ */
+    padding: 11mm 12mm 8mm 14mm;      /* يسار أعرض لتفادي حافة الطباعة */
+    margin: 0 0 8mm 0;                /* لا هوامش جانبية — الصفحة occupy العرض الكامل */
     background: ${C.sheet};
-    overflow: hidden;
+    overflow: visible;                /* لا تُقصّ المحتوى الزائد */
     page-break-after: always;
     break-after: page;
     display: flex;
     flex-direction: column;
   }
-  .print-page:last-child { page-break-after: auto; break-after: auto; }
+  .print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+    margin-bottom: 0;                 /* الصفحة الأخيرة لا تضيف هامشاً سفلياً إضافياً */
+  }
 
   /* الشريط الزخرفي — مربعات الألوان على حافة الصفحة اليسرى.
      الأبعاد من الكليشة الرسمية نفسها، ومرسوم مستطيلات لا صورة:
