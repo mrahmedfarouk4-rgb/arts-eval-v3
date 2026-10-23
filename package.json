@@ -11,6 +11,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "verify": "tsx scripts/verify.ts",
+    "verify:print-lock": "node scripts/verify-print-lock.mjs",
     "doctor": "expo-doctor"
   },
   "dependencies": {

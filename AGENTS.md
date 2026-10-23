@@ -39,3 +39,16 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## ⛔ Frozen print form — DO NOT MODIFY
+
+The official evaluation print form is **frozen**. Never edit these files:
+
+- `lib/print-html.ts`
+- `lib/print-lock.ts`
+- `lib/print-assets.ts`
+- `lib/print-fonts.ts`
+
+A SHA-256 lock guards them. Run `node scripts/verify-print-lock.mjs` (or `npm run verify:print-lock`) after any change; it must pass. Do **not** re-baseline with `--update` unless the user explicitly approves a new official Ministry of Culture form. Full rule: `PRINT-FORM-LOCK.md`.
+
+UI/theme/screen changes must never affect the printed sheet. If a task seems to require touching the print template, stop and ask the user first.

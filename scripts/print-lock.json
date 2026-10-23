@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "frozenAt": "2026-10-23",
+  "algorithm": "sha256",
+  "label": "نموذج التقييم الرسمي — وزارة الثقافة",
+  "files": {
+    "lib/print-html.ts": "1a33a6f5314c074fe63bdd4fc6550296cb56b84ac88986fc6f05b3b16a6435a9",
+    "lib/print-lock.ts": "c80b7d1f1f44f5049cb2eefda9ff6fcc1629158672ff4f6ce7e5b91f24bf48f7",
+    "lib/print-assets.ts": "5995afbfa039e5143182b629b5b7b3793ffb4e4aeab5ea56d305f2eaea11e42e",
+    "lib/print-fonts.ts": "d380993653826271e44f56915a9ed10d7af633c6f0b458394c93735923061e1f"
+  }
+}

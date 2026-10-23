@@ -307,6 +307,13 @@ export default function PrintScreen() {
               title="الطباعة على النموذج الرسمي"
               message="تُطبع الاستمارة بالتخطيط والألوان والشعار وجدول المعايير وجدول الفئات كما في النموذج المعتمد."
             />
+
+            <View style={st.lockRow}>
+              <Ionicons name="lock-closed" size={13} color={p.text3} />
+              <Text style={st.lockText}>
+                نموذج معتمد — شكل الورقة المطبوعة مقفل ولا يمكن تعديله
+              </Text>
+            </View>
           </>
         ) : (
           <>
@@ -456,6 +463,15 @@ const st = StyleSheet.create({
   lvLabel: { fontFamily: fnt.r, fontSize: fs.xxs, color: p.text3, marginTop: 2 },
 
   conv: { fontFamily: fnt.b, fontSize: fs.sm, color: p.primary },
+
+  lockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: -sp.sm,
+  },
+  lockText: { fontFamily: fnt.r, fontSize: fs.xxs, color: p.text3 },
 
   listRow: {
     flexDirection: 'row',

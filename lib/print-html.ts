@@ -1,4 +1,17 @@
 /**
+ * ⛔⛔⛔  مِلَفٌّ مُجَمَّدٌ — لا تُعَدِّلْهُ  ⛔⛔⛔
+ * ===================================================================
+ * هذا الملف هو «الورقة الطباعية الرسمية للتقيمات» المعتمدة.
+ * شكله ولونه وخطوطه وجداوله وتذييله **غير قابلة للتعديل**.
+ *
+ * - أي تعديل هنا يوقف فحص:  npm run verify:print-lock
+ * - لا يُعاد خطّ الأساس إلا بإصدار جديد معتمد من وزارة الثقافة.
+ * - حتى لو تغيّرت واجهة التطبيق أو ألوانه أو شاشاته لاحقاً، تبقى
+ *   الورقة المطبوعة كما هي في هذا الملف.
+ *
+ * القاعدة الكاملة: PRINT-FORM-LOCK.md
+ * ===================================================================
+ *
  * مولّد استمارة الطباعة — نسخة مطابقة للكليشة الرسمية
  * ===================================================================
  * المصدر المرجعي: كليشة «أساسيات الرسم وحدة 1 - مفرغ.docx» الرسمية
@@ -37,6 +50,7 @@ import type { Evaluation } from '@/lib/store';
 
 import { RIBBON_DATA_URI, MOC_LOGO_DATA_URI } from '@/lib/print-assets';
 import { MAJALLA_REGULAR_DATA, MAJALLA_BOLD_DATA } from '@/lib/print-fonts';
+import { PRINT_FORM_LOCK } from '@/lib/print-lock';
 
 /* --------------------------------------------------------------- */
 /*  لوحة الألوان — مطابقة للكليشة الرسمية                          */
@@ -530,6 +544,9 @@ export function buildPrintHtml(
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="print-form-version" content="${PRINT_FORM_LOCK.version}" />
+<meta name="print-form-locked" content="true" />
+<meta name="print-form-label" content="${esc(PRINT_FORM_LOCK.label)}" />
 <title>استمارة التقييم — ${esc(APP.title)}</title>
 <style>
   /* ---------------------------------------------------------------
