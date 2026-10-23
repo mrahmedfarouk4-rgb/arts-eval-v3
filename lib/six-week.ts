@@ -27,6 +27,8 @@ export const REPORT_SUBJECTS = [
   { id: 'cartoon', name: 'الرسم الكرتوني' },
   { id: 'saudi_arts', name: 'الفنون البصرية السعودية' },
   { id: 'digital_drawing', name: 'أنشطة الرسم الرقمي' },
+  { id: 'watercolor', name: 'الرسم بالألوان المائية' },
+  { id: 'handicrafts', name: 'الأشغال الفنية' },
 ] as const;
 
 export type ReportSubjectId = (typeof REPORT_SUBJECTS)[number]['id'];
