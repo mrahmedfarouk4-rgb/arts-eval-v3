@@ -190,11 +190,35 @@ export default function PrintScreen() {
   };
 
   const emit = async (html: string) => {
-    const { uri } = await Print.printToFileAsync({ html });
+    /**
+     * ⚠ على الويب يتجاهل expo-print وسيط html تماماً وينفّذ window.print()
+     * على الصفحة الحالية — فتخرج شاشة المعاينة (البطاقة) بدل الاستمارة.
+     * فنفتح نافذة مستقلة نكتب فيها HTML الاستمارة ثم نطبعها.
+     */
     if (Platform.OS === 'web') {
-      window.open(uri, '_blank');
+      const w = window.open('', '_blank');
+      if (!w) {
+        Alert.alert(
+          'تعذّر الطباعة',
+          'منع المتصفح فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.'
+        );
+        return;
+      }
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      const doPrint = () => {
+        if (w.closed) return;
+        w.focus();
+        w.print();
+      };
+      /* ننتظر تحميل الخطوط والشعار المضمّنين قبل فتح حوار الطباعة */
+      if (w.document.readyState === 'complete') setTimeout(doPrint, 400);
+      else w.addEventListener('load', () => setTimeout(doPrint, 400), { once: true });
       return;
     }
+
+    const { uri } = await Print.printToFileAsync({ html });
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
     } else {
@@ -246,11 +270,15 @@ export default function PrintScreen() {
                 <View style={st.statRow}>
                   <Stat value={`${singleTotal}`} label={`من ${totals.actualMax}`} />
                   <View style={st.divider} />
-                  <Stat
-                    value={singleLv ? singleLv.label.split(' ')[0] : '—'}
-                    label="المستوى"
-                    color={singleLv ? singleLv.color : p.text3}
-                  />
+                  <View style={st.lvCol}>
+                    <Text
+                      style={[st.lvText, { color: singleLv ? singleLv.color : p.text3 }]}
+                      numberOfLines={2}
+                    >
+                      {singleLv ? singleLv.label : '—'}
+                    </Text>
+                    <Text style={st.lvLabel}>المستوى</Text>
+                  </View>
                 </View>
 
                 {singleTotal > 0 && (
@@ -276,8 +304,8 @@ export default function PrintScreen() {
 
             <Banner
               level="info"
-              title="الطباعة مطابقة للتطبيق الأصلي"
-              message="التخطيط والألوان والشعار ونصوص جدول الفئات كما هي في التطبيق الأصلي — نسخة طبق الأصل."
+              title="الطباعة على النموذج الرسمي"
+              message="تُطبع الاستمارة بالتخطيط والألوان والشعار وجدول المعايير وجدول الفئات كما في النموذج المعتمد."
             />
           </>
         ) : (
@@ -422,6 +450,10 @@ const st = StyleSheet.create({
     paddingVertical: sp.md,
   },
   divider: { width: 1, height: 26, backgroundColor: p.line },
+
+  lvCol: { flex: 1, alignItems: 'center', paddingHorizontal: sp.xs },
+  lvText: { fontFamily: fnt.b, fontSize: fs.sm, textAlign: 'center', lineHeight: 20 },
+  lvLabel: { fontFamily: fnt.r, fontSize: fs.xxs, color: p.text3, marginTop: 2 },
 
   conv: { fontFamily: fnt.b, fontSize: fs.sm, color: p.primary },
 
