@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { c, sp, rad, fnt, fs, sh, scaleTone, scaleBg } from '@/constants/brand';
+import { c, sp, rad, fnt, fs, sh, scaleTone, scaleBg, scaleFg } from '@/constants/brand';
 import { useSession } from '@/lib/session';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'expo-router';
@@ -73,7 +73,7 @@ const BTN: Record<BtnVariant, { bg: string; fg: string; bd: string }> = {
   surface: { bg: c.bgAlt, fg: c.text, bd: c.lineHi },
   ghost:   { bg: 'transparent', fg: c.primary, bd: 'transparent' },
   soft:    { bg: c.primaryBg, fg: c.primary, bd: c.primaryLine },
-  danger:  { bg: c.errBg, fg: c.err, bd: 'rgba(178,58,58,0.25)' },
+  danger:  { bg: c.errBg, fg: c.errText, bd: c.errLine },
 };
 
 const BTN_SIZE = {
@@ -206,7 +206,7 @@ export function WeekStrip({ days }: { days: WeekDay[] }) {
       {days.map((d) => (
         <View key={d.n} style={[styles.day, d.today && styles.dayOn]}>
           <Text style={[styles.dayLabel, d.today && styles.dayLabelOn]}>{d.label}</Text>
-          <Text style={[styles.dayNum, d.today && styles.dayNumOn]}>{d.day}</Text>
+          <Text style={[styles.dayNum, d.today && styles.dayNumOn]}>{ar(d.day)}</Text>
           <Text style={[styles.dayCount, d.today && styles.dayCountOn]}>
             {d.count > 0 ? ar(d.count) : '—'}
           </Text>
@@ -226,8 +226,8 @@ export function WeekStrip({ days }: { days: WeekDay[] }) {
   );
 }
 
-/** أرقام عربية-هندية — كما في الكليشة */
-const ar = (n: number | string) =>
+/** أرقام عربية-هندية — كما في الكليشة (مُصدَّرة لكل شاشة تعرض رقماً داخل نص عربي) */
+export const ar = (n: number | string) =>
   String(n ?? '').replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
 
 /**
@@ -436,9 +436,9 @@ export function Banner({
 }
 
 const BANNER = {
-  info:  { bg: c.infoBg,  bd: 'rgba(15,123,138,0.22)',  fg: c.info,  icon: 'information-circle' as IconName },
-  warn:  { bg: c.warnBg,  bd: 'rgba(168,115,11,0.24)',  fg: c.warn,  icon: 'warning' as IconName },
-  error: { bg: c.errBg,   bd: 'rgba(178,58,58,0.22)',   fg: c.err,   icon: 'alert-circle' as IconName },
+  info:  { bg: c.infoBg,  bd: c.infoLine, fg: c.infoText,  icon: 'information-circle' as IconName },
+  warn:  { bg: c.warnBg,  bd: c.warnLine, fg: c.warnText,  icon: 'warning' as IconName },
+  error: { bg: c.errBg,   bd: c.errLine,  fg: c.errText,   icon: 'alert-circle' as IconName },
 };
 
 /* ================================================================== */
@@ -474,9 +474,9 @@ export function ScaleRow({
             accessibilityState={{ selected: on, disabled }}
             accessibilityLabel={`${SCALE_LABELS[n - 1]} — ${n}`}
           >
-            <Text style={[styles.scaleNum, on && { color: scaleTone[n - 1] }]}>{n}</Text>
+            <Text style={[styles.scaleNum, on && { color: scaleFg[n - 1] }]}>{n}</Text>
             {!compact && (
-              <Text style={[styles.scaleLbl, on && { color: scaleTone[n - 1] }]} numberOfLines={1}>
+              <Text style={[styles.scaleLbl, on && { color: scaleFg[n - 1] }]} numberOfLines={1}>
                 {SCALE_LABELS[n - 1]}
               </Text>
             )}
@@ -656,10 +656,10 @@ export function ModeToggle() {
       <Ionicons
         name={authenticated ? (editMode ? 'lock-open' : 'lock-closed') : 'person-circle-outline'}
         size={13}
-        color={editMode ? c.ok : authenticated ? c.text3 : c.warn}
+        color={editMode ? c.okText : authenticated ? c.text3 : c.warnText}
       />
       <Text
-        style={[styles.chipText, editMode && { color: c.ok }]}
+        style={[styles.chipText, editMode && { color: c.okText }]}
         numberOfLines={1}
       >
         {user ? user.name : editMode ? 'تعديل' : 'زائر'}
@@ -681,8 +681,8 @@ export function EditChip({ on, onPress }: { on: boolean; onPress: () => void }) 
       accessibilityState={{ checked: on }}
       accessibilityLabel="وضع التعديل"
     >
-      <Ionicons name={on ? 'lock-open' : 'lock-closed'} size={13} color={on ? c.ok : c.text3} />
-      <Text style={[styles.chipText, on && { color: c.ok }]}>{on ? 'تعديل' : 'عرض'}</Text>
+      <Ionicons name={on ? 'lock-open' : 'lock-closed'} size={13} color={on ? c.okText : c.text3} />
+      <Text style={[styles.chipText, on && { color: c.okText }]}>{on ? 'تعديل' : 'عرض'}</Text>
     </Pressable>
   );
 }
@@ -708,7 +708,7 @@ export function StepBar({ active }: { active: 0 | 1 | 2 | 3 }) {
                   (isOn || isDone) && { color: c.onPrimary },
                 ]}
               >
-                {isDone ? '✓' : i + 1}
+                {isDone ? '✓' : ar(i + 1)}
               </Text>
             </View>
             <Text style={[styles.stepText, isOn && { color: c.primary, fontFamily: fnt.b }]}>
@@ -837,17 +837,14 @@ const styles = StyleSheet.create({
    *
    * الحدّ والظلّ معاً يعطيان عمقاً هادئاً؛ و`overflow:hidden` يبقي
    * الشريط اللوني على الحافة مقصوصاً بحدّ البطاقة لا طافياً عليها.
+   * الظل بأحد ألوان العلامة عبر `sh.md` لا بلون خارج الدليل.
    */
   card: {
     backgroundColor: c.white,
     borderRadius: rad.md,
     borderWidth: 1, borderColor: c.line,
     overflow: 'hidden',
-    shadowColor: '#0F2837',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.10,
-    shadowRadius: 30,
-    elevation: 4,
+    ...sh.md,
   },
   accent: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 5 },
 
@@ -960,7 +957,7 @@ const styles = StyleSheet.create({
     backgroundColor: c.bgLift,
     borderWidth: 1, borderColor: c.line,
   },
-  chipOn: { backgroundColor: c.okBg, borderColor: 'rgba(15,122,79,0.28)' },
+  chipOn: { backgroundColor: c.okBg, borderColor: c.okLine },
   chipText: { fontFamily: fnt.b, fontSize: fs.xxs, color: c.text3 },
 
   /* شريط الخطوات */

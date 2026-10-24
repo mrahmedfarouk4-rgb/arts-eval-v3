@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import { c } from '@/constants/brand';
-import { NavRail, RAIL_W, LTR, RTL } from '@/components/nav-rail';
+import { NavRail, NavDrawer, NavDrawerProvider, RAIL_W, LTR, RTL } from '@/components/nav-rail';
 
 /**
  * تخطيط التنقّل: الشريط الجانبي على اليمين + المحتوى.
@@ -15,18 +15,25 @@ import { NavRail, RAIL_W, LTR, RTL } from '@/components/nav-rail';
  *   root      → ltr  (ترتيب الأبناء فيزيائي: أول = يسار)
  *   content   → rtl  (حتى تبقى شاشات التطبيق عربية)
  *   railSlot  → ltr  (ليكون الشريط ثانياً = يميناً فيزيائياً)
+ *
+ * الدرج ابنٌ لـ root لا لـ railSlot: لو بقي داخل عمود الشريط
+ * لَضاق عرضه على ٧٢ بكسلاً فقط ورُسم الشريط فوق عناوينه.
  */
 export default function RailLayout() {
   return (
-    <View style={s.root}>
-      <View style={s.content}>
-        <Slot />
-      </View>
+    <NavDrawerProvider>
+      <View style={s.root}>
+        <View style={s.content}>
+          <Slot />
+        </View>
 
-      <View style={s.railSlot}>
-        <NavRail />
+        <View style={s.railSlot}>
+          <NavRail />
+        </View>
+
+        <NavDrawer />
       </View>
-    </View>
+    </NavDrawerProvider>
   );
 }
 

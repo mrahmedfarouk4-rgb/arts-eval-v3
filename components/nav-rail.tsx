@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  createContext, useContext, useEffect, useMemo, useRef, useState,
+} from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Dimensions, ScrollView, Platform,
+  View, Text, StyleSheet, Pressable, Dimensions, ScrollView, Platform, Animated, Easing,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +24,11 @@ export const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
 ];
 
 const RAIL_W = 72;
-const RAIL_W_OPEN = Math.min(300, Math.round(W * 0.82));
+/** الدرج يترك هامشاً من الخلفية حتى يُقرأ كطبقة فوقية لا كشاشة بديلة */
+const DRAWER_W = Math.min(320, Math.round(W * 0.86));
+const NATIVE_DRIVER = Platform.OS !== 'web';
+/** العتمة تتلاشى، فلا بد من مكوّن متحرّك — opacity في Pressable عادي تُتجاهل */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * اتجاه الحاوية — مهم جداً.
@@ -37,6 +43,47 @@ export const RTL = Platform.OS === 'web' ? {} : ({ direction: 'rtl' } as const);
 
 export { RAIL_W };
 
+/** العنصر النشط — الرئيسية تلتقط مسار المجموعة أيضاً */
+const isActiveHref = (pathname: string, href: string) =>
+  href === '/' ? pathname === '/' || pathname === '/(tabs)' : pathname.startsWith(href);
+
+/* ================================================================== */
+/*  حالة الدرج                                                        */
+/* ================================================================== */
+
+interface DrawerApi {
+  open: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+}
+
+const DrawerCtx = createContext<DrawerApi | null>(null);
+
+/**
+ * يغلّف تخطيط التبويبات. يجب أن يُركّب `NavDrawer` داخل نفس الحاوية
+ * التي يغلّفها، وإلا عاد الدرج محصوراً في عمود الشريط الضيّق.
+ */
+export function NavDrawerProvider({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  // تغيير المسار إغلاقٌ للدرج
+  useEffect(() => { setOpen(false); }, [pathname]);
+
+  const value = useMemo<DrawerApi>(
+    () => ({ open, openDrawer: () => setOpen(true), closeDrawer: () => setOpen(false) }),
+    [open],
+  );
+
+  return <DrawerCtx.Provider value={value}>{children}</DrawerCtx.Provider>;
+}
+
+function useDrawer(): DrawerApi {
+  const ctx = useContext(DrawerCtx);
+  if (!ctx) throw new Error('الدرج يحتاج NavDrawerProvider');
+  return ctx;
+}
+
 /* ================================================================== */
 /*  الشريط الجانبي — يبقى ظاهراً دائماً على اليمين                    */
 /* ================================================================== */
@@ -45,193 +92,241 @@ export function NavRail() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { user, authenticated, logout } = useAuth();
-  const [open, setOpen] = useState(false);
+  const { openDrawer } = useDrawer();
 
-  // إغلاق الدرج عند تغيير المسار
-  useEffect(() => { setOpen(false); }, [pathname]);
-
-  const isActive = (href: string) =>
-    href === '/' ? pathname === '/' || pathname === '/(tabs)' : pathname.startsWith(href);
+  const isActive = (href: string) => isActiveHref(pathname, href);
 
   const go = (href: string) => router.push(href as never);
 
+  return (
+    <View
+      style={[
+        s.rail,
+        { paddingTop: insets.top + sp.sm, paddingBottom: insets.bottom + sp.sm },
+      ]}
+    >
+      {/* الشعار */}
+      <Pressable
+        onPress={() => go('/')}
+        style={s.railLogo}
+        accessibilityLabel="الصفحة الرئيسية"
+      >
+        <View style={s.emblemBox}>
+          <EMBLEM style={s.emblemImg} resizeMode="contain" />
+        </View>
+      </Pressable>
+
+      <View style={s.railRule} />
+
+      {/* العناصر */}
+      <View style={{ gap: sp.xxs }}>
+        {NAV_ITEMS.map((item) => {
+          const on = isActive(item.href);
+          return (
+            <Pressable
+              key={item.href}
+              onPress={() => go(item.href)}
+              style={({ pressed }) => [s.railItem, on && s.railItemOn, pressed && { opacity: 0.7 }]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={item.label}
+            >
+              <View style={[s.railIconBox, on && s.railIconBoxOn]}>
+                <Ionicons
+                  name={item.icon}
+                  size={21}
+                  color={on ? c.onPrimary : c.text3}
+                />
+              </View>
+              <Text style={[s.railLabel, on && s.railLabelOn]} numberOfLines={1}>
+                {item.label}
+              </Text>
+              {on && <View style={s.railTick} />}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={{ flex: 1 }} />
+
+      {/* فتح الدرج */}
+      <Pressable
+        onPress={openDrawer}
+        style={({ pressed }) => [s.railMenu, pressed && { opacity: 0.7 }]}
+        accessibilityLabel="القائمة"
+      >
+        <Ionicons name="menu" size={20} color={c.text2} />
+      </Pressable>
+    </View>
+  );
+}
+
+/* ================================================================== */
+/*  الدرج الموسّع — طبقة تغطي الشاشة كلها فوق الشريط                 */
+/* ================================================================== */
+
+export function NavDrawer() {
+  const { open, closeDrawer } = useDrawer();
+  const router = useRouter();
+  const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const { user, authenticated, logout } = useAuth();
+  const [mounted, setMounted] = useState(open);
+  // 0 = مطويّ خارج يمين الشاشة، 1 = مفتوح بالكامل
+  const slide = useRef(new Animated.Value(open ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (open) setMounted(true);
+    const duration = open ? 260 : 200;
+    const anim = Animated.timing(slide, {
+      toValue: open ? 1 : 0,
+      duration,
+      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.quad),
+      useNativeDriver: NATIVE_DRIVER,
+    });
+    anim.start(({ finished }) => {
+      // لا نُفكّ التركيب إلا إذا اكتمل الخروج ولم يُفتح الدرج من جديد
+      if (finished && !open) setMounted(false);
+    });
+    // المتصفح يجمّد requestAnimationFrame في التبويب المخفي فتتوقف الحركة
+    // ويبقى الدرج معلّقاً مطويّاً — نُكمل الحالة النهائية بمؤقّت لا يعتمد على الرسم
+    const settle = setTimeout(() => {
+      slide.setValue(open ? 1 : 0);
+      if (!open) setMounted(false);
+    }, duration + 80);
+    return () => { clearTimeout(settle); anim.stop(); };
+  }, [open, slide]);
+
+  if (!mounted) return null;
+
+  const go = (href: string) => { closeDrawer(); router.push(href as never); };
+
   const onLogout = async () => {
+    closeDrawer();
     await logout();
-    setOpen(false);
     router.replace('/welcome' as never);
   };
 
   return (
-    <>
-      {/* ---------- الشريط الضيّق الدائم ---------- */}
-      <View
+    <View style={s.overlay} pointerEvents="box-none">
+      <AnimatedPressable
+        style={[s.scrim, { opacity: slide }]}
+        onPress={closeDrawer}
+        accessibilityLabel="إغلاق القائمة"
+      />
+      <Animated.View
         style={[
-          s.rail,
-          { paddingTop: insets.top + sp.sm, paddingBottom: insets.bottom + sp.sm },
+          s.drawer,
+          {
+            width: DRAWER_W,
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+            transform: [{
+              translateX: slide.interpolate({
+                inputRange: [0, 1],
+                outputRange: [`${DRAWER_W}px`, '0px'],
+              }),
+            }],
+          },
         ]}
       >
-        {/* الشعار */}
-        <Pressable
-          onPress={() => go('/')}
-          style={s.railLogo}
-          accessibilityLabel="الصفحة الرئيسية"
-        >
-          <View style={s.emblemBox}>
-            <EMBLEM style={s.emblemImg} resizeMode="contain" />
-          </View>
-        </Pressable>
-
-        <View style={s.railRule} />
-
-        {/* العناصر */}
-        <View style={{ gap: sp.xxs }}>
-          {NAV_ITEMS.map((item) => {
-            const on = isActive(item.href);
-            return (
-              <Pressable
-                key={item.href}
-                onPress={() => go(item.href)}
-                style={({ pressed }) => [s.railItem, on && s.railItemOn, pressed && { opacity: 0.7 }]}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={item.label}
-              >
-                <View style={[s.railIconBox, on && s.railIconBoxOn]}>
-                  <Ionicons
-                    name={item.icon}
-                    size={21}
-                    color={on ? c.onPrimary : c.text3}
-                  />
-                </View>
-                <Text style={[s.railLabel, on && s.railLabelOn]} numberOfLines={1}>
-                  {item.label}
-                </Text>
-                {on && <View style={s.railTick} />}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={{ flex: 1 }} />
-
-        {/* فتح الدرج */}
-        <Pressable
-          onPress={() => setOpen(true)}
-          style={({ pressed }) => [s.railMenu, pressed && { opacity: 0.7 }]}
-          accessibilityLabel="القائمة"
-        >
-          <Ionicons name="menu" size={20} color={c.text2} />
-        </Pressable>
-      </View>
-
-      {/* ---------- الدرج الموسّع ---------- */}
-      {open && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <Pressable style={s.scrim} onPress={() => setOpen(false)} accessibilityLabel="إغلاق" />
-          <View
-            style={[
-              s.drawer,
-              { width: RAIL_W_OPEN, paddingTop: insets.top + sp.lg, paddingBottom: insets.bottom + sp.lg },
-            ]}
-          >
-            <View style={s.drawerHead}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.drawerTitle}>القائمة</Text>
-                <Text style={s.drawerSub} numberOfLines={1}>{BRAND.academy}</Text>
-              </View>
-              <Pressable onPress={() => setOpen(false)} hitSlop={10} style={s.drawerClose}>
-                <Ionicons name="close" size={19} color={c.text2} />
-              </Pressable>
+        <View style={[s.drawerInner, RTL]}>
+          <View style={s.drawerHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.drawerTitle}>القائمة</Text>
+              <Text style={s.drawerSub} numberOfLines={1}>{BRAND.academy}</Text>
             </View>
+            <Pressable onPress={closeDrawer} hitSlop={10} style={s.drawerClose}>
+              <Ionicons name="close" size={19} color={c.text2} />
+            </Pressable>
+          </View>
+
+          <View style={s.drawerRule} />
+
+          <ScrollView style={s.drawerScroll} showsVerticalScrollIndicator={false}>
+            {NAV_ITEMS.map((item, i) => {
+              const on = isActiveHref(pathname, item.href);
+              return (
+                <Pressable
+                  key={item.href}
+                  onPress={() => go(item.href)}
+                  style={({ pressed }) => [s.drawerItem, on && s.drawerItemOn, pressed && { opacity: 0.75 }]}
+                  accessibilityRole="menuitem"
+                >
+                  <View style={[s.drawerIcon, on && { backgroundColor: c.white }]}>
+                    <Ionicons name={item.icon} size={19} color={on ? c.primary : c.text3} />
+                  </View>
+                  <Text style={[s.drawerLabel, on && { color: c.primary, fontFamily: fnt.b }]}>{item.label}</Text>
+                  <Text style={s.drawerIdx}>{String(i + 1).padStart(2, '0')}</Text>
+                </Pressable>
+              );
+            })}
 
             <View style={s.drawerRule} />
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: sp.sm }}>
-              {NAV_ITEMS.map((item, i) => {
-                const on = isActive(item.href);
-                return (
-                  <Pressable
-                    key={item.href}
-                    onPress={() => go(item.href)}
-                    style={({ pressed }) => [s.drawerItem, on && s.drawerItemOn, pressed && { opacity: 0.75 }]}
-                    accessibilityRole="menuitem"
-                  >
-                    <View style={[s.drawerIcon, on && { backgroundColor: c.primaryBg }]}>
-                      <Ionicons name={item.icon} size={19} color={on ? c.primary : c.text3} />
-                    </View>
-                    <Text style={[s.drawerLabel, on && { color: c.primary }]}>{item.label}</Text>
-                    <Text style={s.drawerIdx}>{String(i + 1).padStart(2, '0')}</Text>
-                  </Pressable>
-                );
-              })}
-
-              <View style={s.drawerRule} />
-
-              <Pressable
-                onPress={() => { setOpen(false); router.push('/info' as never); }}
-                style={({ pressed }) => [s.drawerItem, pressed && { opacity: 0.75 }]}
-                accessibilityRole="menuitem"
-              >
-                <View style={s.drawerIcon}>
-                  <Ionicons name="information-circle-outline" size={19} color={c.text3} />
-                </View>
-                <Text style={s.drawerLabel}>عن المنصة</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => { setOpen(false); router.push('/print' as never); }}
-                style={({ pressed }) => [s.drawerItem, pressed && { opacity: 0.75 }]}
-                accessibilityRole="menuitem"
-              >
-                <View style={s.drawerIcon}>
-                  <Ionicons name="print-outline" size={19} color={c.text3} />
-                </View>
-                <Text style={s.drawerLabel}>الطباعة</Text>
-              </Pressable>
-
-              <View style={s.drawerRule} />
-
-              {/* الخروج */}
-              <Pressable
-                onPress={onLogout}
-                style={({ pressed }) => [s.drawerItem, s.drawerItemOut, pressed && { opacity: 0.75 }]}
-                accessibilityRole="menuitem"
-                accessibilityLabel="تسجيل الخروج"
-              >
-                <View style={[s.drawerIcon, { backgroundColor: c.errBg }]}>
-                  <Ionicons name="log-out-outline" size={19} color={c.err} />
-                </View>
-                <Text style={[s.drawerLabel, { color: c.err, fontFamily: fnt.b }]}>
-                  تسجيل الخروج
-                </Text>
-                <Ionicons name="chevron-back" size={15} color={c.text4} />
-              </Pressable>
-            </ScrollView>
-
-            <View style={s.drawerFoot}>
-              <View style={s.drawerUser}>
-                <View style={[s.drawerIcon, { width: 30, height: 30 }]}>
-                  <Ionicons
-                    name={authenticated ? 'person-circle-outline' : 'person-outline'}
-                    size={17}
-                    color={c.primary}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.drawerUserName} numberOfLines={1}>
-                    {user?.username ?? 'ضيف'}
-                  </Text>
-                  <Text style={s.drawerUserRole}>
-                    {authenticated ? 'معلّم مصادق' : 'وضع الضيف'}
-                  </Text>
-                </View>
+            <Pressable
+              onPress={() => go('/info')}
+              style={({ pressed }) => [s.drawerItem, pressed && { opacity: 0.75 }]}
+              accessibilityRole="menuitem"
+            >
+              <View style={s.drawerIcon}>
+                <Ionicons name="information-circle-outline" size={19} color={c.text3} />
               </View>
-              <HorizontalLogo style={s.drawerLogo} resizeMode="contain" />
+              <Text style={s.drawerLabel}>عن المنصة</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => go('/print')}
+              style={({ pressed }) => [s.drawerItem, pressed && { opacity: 0.75 }]}
+              accessibilityRole="menuitem"
+            >
+              <View style={s.drawerIcon}>
+                <Ionicons name="print-outline" size={19} color={c.text3} />
+              </View>
+              <Text style={s.drawerLabel}>الطباعة</Text>
+            </Pressable>
+
+            <View style={s.drawerRule} />
+
+            {/* الخروج */}
+            <Pressable
+              onPress={onLogout}
+              style={({ pressed }) => [s.drawerItem, s.drawerItemOut, pressed && { opacity: 0.75 }]}
+              accessibilityRole="menuitem"
+              accessibilityLabel="تسجيل الخروج"
+            >
+              <View style={[s.drawerIcon, { backgroundColor: c.white }]}>
+                <Ionicons name="log-out-outline" size={19} color={c.errText} />
+              </View>
+              <Text style={[s.drawerLabel, { color: c.errText, fontFamily: fnt.b }]}>
+                تسجيل الخروج
+              </Text>
+              <Ionicons name="chevron-back" size={15} color={c.text4} />
+            </Pressable>
+          </ScrollView>
+
+          <View style={s.drawerFoot}>
+            <View style={s.drawerUser}>
+              <View style={[s.drawerIcon, { width: 30, height: 30, backgroundColor: c.white }]}>
+                <Ionicons
+                  name={authenticated ? 'person-circle-outline' : 'person-outline'}
+                  size={17}
+                  color={c.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.drawerUserName} numberOfLines={1}>
+                  {user?.username ?? 'ضيف'}
+                </Text>
+                <Text style={s.drawerUserRole}>
+                  {authenticated ? 'معلّم مصادق' : 'وضع الضيف'}
+                </Text>
+              </View>
             </View>
+            <HorizontalLogo style={s.drawerLogo} resizeMode="contain" />
           </View>
         </View>
-      )}
-    </>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -295,25 +390,35 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  /* الدرج — scrim بـ ltr فيبقى right:0 فيزيائياً على اليمين */
+  /* الدرج */
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    ...LTR,
+    zIndex: 50,
+  },
   scrim: {
     ...StyleSheet.absoluteFillObject,
     ...LTR,
-    backgroundColor: c.scrim,
-    zIndex: 40,
+    backgroundColor: c.scrimHard,
   },
+  /** الحاوية المتحرّكة: ltr فيزيائية، فـ right:0 و translateX كلاهما على اليمين */
   drawer: {
     position: 'absolute',
     top: 0, bottom: 0, right: 0,
-    ...RTL,
+    ...LTR,
     backgroundColor: c.tileBg,
     borderLeftWidth: 1,
     borderLeftColor: c.tileBorder,
-    paddingHorizontal: sp.lg,
-    zIndex: 41,
     ...sh.lg,
   },
-  drawerHead: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm },
+  drawerInner: {
+    flex: 1,
+    paddingHorizontal: sp.md,
+  },
+  drawerHead: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm,
+    paddingHorizontal: sp.xs, paddingTop: sp.md,
+  },
   drawerTitle: { fontFamily: fnt.eb, fontSize: fs.xl, color: c.text },
   drawerSub: { fontFamily: fnt.r, fontSize: fs.xs, color: c.text3, marginTop: 2 },
   drawerClose: {
@@ -322,9 +427,10 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   drawerRule: { height: 1, backgroundColor: c.line, marginVertical: sp.md },
+  drawerScroll: { flex: 1 },
 
   drawerItem: {
-    flexDirection: 'row', alignItems: 'center', gap: sp.md,
+    flexDirection: 'row', alignItems: 'center', gap: sp.sm,
     paddingVertical: sp.md, paddingHorizontal: sp.sm,
     borderRadius: rad.md,
     marginBottom: 2,
@@ -348,8 +454,8 @@ const s = StyleSheet.create({
   drawerUser: {
     alignSelf: 'stretch',
     flexDirection: 'row', alignItems: 'center', gap: sp.sm,
-    backgroundColor: c.bg,
-    borderRadius: rad.md, borderWidth: 1, borderColor: c.line,
+    backgroundColor: c.bgLift,
+    borderRadius: rad.md,
     paddingHorizontal: sp.sm, paddingVertical: sp.sm,
     marginBottom: sp.md,
   },

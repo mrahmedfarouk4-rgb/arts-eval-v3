@@ -3,18 +3,12 @@
  * ===================================================================
  * مستندة **حرفياً** إلى "Afaq Academy Brand Guideline" (1447هـ / 2025م).
  *
- * الألوان الرسمية (RGB للشاشات، CMYK للطباعة):
- *   Primary:      #004645  (RGB 0, 70, 69)     — اللون الأساسي للعلامة
- *   Secondary:    #621244  (RGB 98, 18, 68)    — بنفسجي داكن / ثانوي
- *   Accent:      #D17E30  (RGB 209, 126, 48)  — برتقالي دافئ (تمييز أساسي)
- *   (الأصفر أُلغي — استُبدل بـ Mint/Blue cheerful accents)
+ * لوحة الألوان المعتمدة — ١٢ لوناً في أربع عائلات، كل عائلة: غامق → متوسط → فاتح
+ *   Teal:   #004645 → #83D5C4 → #C6EEE5     Pink:   #621244 → #E5A1C8 → #F5D7E8
+ *   Blue:   #262674 → #83C3EB → #C0E1F7     Warm:   #FBE122 → #D17E30 → #FDDCC8
  *
- * لوحة الألوان الداعمة (من الدليل):
- *   Blues:    #262674, #83C3EB, #C0E1F7
- *   Greens:   #83D5C4, #C6EEE5
- *   Pinks:    #E5A1C8, #F5D7E8
- *   Warm:     #D17E30, #FDDCC8
- *   Deep:     #262674, #621244
+ * قاعدة الحبر: الدرجة الفاتحة للحشو والحدود والأشرطة فقط، وللنص درجة غامقة
+ * من العائلة نفسها (أو onBase فوق لون المرحلة).
  *
  * الشعار:
  *   - الأفقي: النسخة الأساسية (الأغلب استخداماً)
@@ -32,6 +26,17 @@
 export const BRAND = {
   academy: 'أكاديمية آفاق للفنون والثقافة',
   academyEn: 'Afaq Academy for Fine Arts & Culture',
+} as const;
+
+/**
+ * لوحة الدليل الرسمي — ١٢ لوناً في أربع عائلات، كل عائلة: غامق → متوسط → فاتح.
+ * هي المرجع الوحيد لكل لون في الواجهة (المطبوعة الرسمية لها PRINT).
+ */
+export const IDENTITY = {
+  teal: ['#004645', '#83D5C4', '#C6EEE5'],
+  pink: ['#621244', '#E5A1C8', '#F5D7E8'],
+  blue: ['#262674', '#83C3EB', '#C0E1F7'],
+  warm: ['#FBE122', '#D17E30', '#FDDCC8'],
 } as const;
 
 /* ================================================================== */
@@ -101,6 +106,10 @@ export const c = {
   peach: '#FDDCC8',
   peachBg: 'rgba(253, 220, 200, 0.12)',
 
+  /** أصفر معتمد — #FBE122 (للخلفيات والدرجات الأعلى، لا كنص على أبيض) */
+  sun: '#FBE122',
+  sunBg: 'rgba(251, 225, 34, 0.22)',
+
   /* ===== تدرجات رمادية محايدة ===== */
   neutral50: '#FAFAFA',
   neutral100: '#F5F5F5',
@@ -153,6 +162,8 @@ export const c = {
   accentHi: '#83D5C4',
   accentBg: 'rgba(209, 126, 48, 0.14)',
   accentLine: 'rgba(209, 126, 48, 0.50)',
+  /** درجة العائلة الدافئة للحبر والأيقونات — accent نفسه 2.9:1 على أبيض فلا يحمل نصاً */
+  warmInk: '#B86A22',
 
   /** زر الإجراء الأساسي — يستخدم لون العلامة (Teal) للتباين والاحترافية */
   action: '#004645',
@@ -205,15 +216,24 @@ export const c = {
   s3: '#83D5C4', s3Bg: 'rgba(131, 213, 196, 0.12)',
   s4: '#621244', s4Bg: 'rgba(98, 18, 68, 0.12)',
 
-  /* دلالات */
+  /* دلالات — الحدود والنص مشتقة من عائلة اللون نفسه:
+     الفاتح للحشو والأشرطة فقط، وللنص درجة غامقة مقروءة. */
   ok: '#83D5C4',
   okBg: 'rgba(131, 213, 196, 0.11)',
+  okLine: 'rgba(131, 213, 196, 0.45)',
+  okText: '#004645',
   warn: '#83C3EB',
   warnBg: 'rgba(131, 195, 235, 0.12)',
+  warnLine: 'rgba(131, 195, 235, 0.50)',
+  warnText: '#262674',
   err: '#D17E30',
   errBg: 'rgba(209, 126, 48, 0.09)',
+  errLine: 'rgba(209, 126, 48, 0.32)',
+  errText: '#621244',
   info: '#83C3EB',
   infoBg: 'rgba(131, 195, 235, 0.09)',
+  infoLine: 'rgba(131, 195, 235, 0.45)',
+  infoText: '#262674',
 
   /* الطبقات */
   scrim: 'rgba(0, 70, 69, 0.32)',
@@ -304,25 +324,27 @@ export const GRAD = {
 /* ================================================================== */
 
 export const kindTone = {
-  weekly: { c: '#006E6D', bg: 'rgba(0, 110, 109, 0.10)' },
-  periodic: { c: '#83D5C4', bg: 'rgba(131, 213, 196, 0.10)' },
+  weekly: { c: '#004645', bg: 'rgba(0, 70, 69, 0.10)' },
+  periodic: { c: '#262674', bg: 'rgba(38, 38, 116, 0.10)' },
   final: { c: '#621244', bg: 'rgba(98, 18, 68, 0.10)' },
 } as const;
 
+/**
+ * مستويات الأداء الأربعة — كل مستوى لون غامق معتمد على درجة فاتحة من عائلته.
+ * التباين لكل زوج ≥ 8.5:1 (AA للنص الصغير).
+ */
 export const levelTone = {
-  gifted: { c: '#621244', bg: 'rgba(98, 18, 68, 0.11)' },
-  achieved: { c: '#83D5C4', bg: 'rgba(131, 213, 196, 0.11)' },
-  approaching: { c: '#83D5C4', bg: 'rgba(131, 213, 196, 0.12)' },
-  below: { c: '#D17E30', bg: 'rgba(209, 126, 48, 0.11)' },
+  gifted: { c: '#621244', bg: '#F5D7E8' },
+  achieved: { c: '#004645', bg: '#C6EEE5' },
+  approaching: { c: '#262674', bg: '#C0E1F7' },
+  below: { c: '#621244', bg: '#FDDCC8' },
 } as const;
 
-export const scaleTone = ['#D17E30', '#83D5C4', '#83C3EB', '#621244'] as const;
-export const scaleBg = [
-  'rgba(209, 126, 48, 0.12)',
-  'rgba(131, 213, 196, 0.12)',
-  'rgba(131, 213, 196, 0.12)',
-  'rgba(98, 18, 68, 0.12)',
-] as const;
+/** سُلّم الملاحظة من ١ (دون الهدف) إلى ٤ (يتخطى) — tone للحدود والحشو */
+export const scaleTone = ['#D17E30', '#262674', '#004645', '#621244'] as const;
+export const scaleBg = ['#FDDCC8', '#C0E1F7', '#C6EEE5', '#FBE122'] as const;
+/** نص مقروء على scaleBg — اللون الفاتح وحده لا يكفي كنص صغير */
+export const scaleFg = ['#621244', '#262674', '#004645', '#621244'] as const;
 
 /* ================================================================== */
 /*  المطبوعة الرسمية (عنابي — وثيقة حكومية، لا علاقة لها بالهوية)       */
@@ -351,6 +373,47 @@ export const ORG = {
   academy: 'أكاديمية آفاق للفنون والثقافة',
   portal: 'https://engage.moc.gov.sa/cultural-talents-schools',
 } as const;
+
+/**
+ * لكل مرحلة لون خاص بها من اللوحة المعتمدة، بنفس ترتيب بطاقات المرحلة في
+ * الرئيسية. قاعدة الدليل: الدرجة الفاتحة لا تحمل نصاً أبيض صغيراً، فللأزرق
+ * والدافئ onBase داكن.
+ */
+export type GradeTone = {
+  /** الشريط الجانبي والحدود والتعبئة */
+  base: string;
+  /** نهاية التدرج خلف base */
+  deep: string;
+  /** خلفية بلاطات الأيقونات والشرائح غير المحددة */
+  tint: string;
+  /** نص مقروء فوق base */
+  onBase: string;
+  /** نص ثانوي فوق base */
+  onBaseMuted: string;
+};
+
+export const GRADE_TONES: Record<string, GradeTone> = {
+  grade4: {
+    base: '#004645', deep: '#003635', tint: 'rgba(0, 70, 69, 0.10)',
+    onBase: '#FFFFFF', onBaseMuted: 'rgba(255, 255, 255, 0.78)',
+  },
+  grade5: {
+    base: '#621244', deep: '#4A0D33', tint: 'rgba(98, 18, 68, 0.10)',
+    onBase: '#FFFFFF', onBaseMuted: 'rgba(255, 255, 255, 0.78)',
+  },
+  grade_int1: {
+    base: '#83C3EB', deep: '#262674', tint: 'rgba(131, 195, 235, 0.18)',
+    onBase: '#171717', onBaseMuted: 'rgba(23, 23, 23, 0.72)',
+  },
+  grade_int2: {
+    base: '#D17E30', deep: '#B86A22', tint: 'rgba(209, 126, 48, 0.14)',
+    onBase: '#171717', onBaseMuted: 'rgba(23, 23, 23, 0.85)',
+  },
+};
+
+export function gradeTone(gradeId?: string | null): GradeTone {
+  return GRADE_TONES[gradeId ?? ''] ?? GRADE_TONES.grade_int1;
+}
 
 export const GRADE_COLORS = ['#004645', '#621244', '#83C3EB', '#D17E30', '#83D5C4', '#E5A1C8'] as const;
 
@@ -383,4 +446,26 @@ export function subjectColor(id: string): string {
   return SUBJECT_COLORS[id] ?? c.primary;
 }
 
-export default { BRAND, c, sp, rad, fnt, fs, lh, sh, GRAD, kindTone, levelTone, scaleTone, scaleBg, PRINT, ORG, GRADE_COLORS, gradeColor, SUBJECT_COLORS, subjectColor };
+/**
+ * نغمة المقرر لبطاقة بيضاء بشريط جانبي: base للشريط، وink للأيقونة وكل نص
+ * فوق البلاطة — الفاتح من اللوحة لا يُقرأ حبراً فله غامق عائلته.
+ */
+const SUBJECT_INK: Record<string, string> = {
+  drawing_basics: '#004645',
+  digital_drawing: '#621244',
+  watercolor: '#B86A22',
+  cartoon: '#621244',
+  saudi_arts: '#262674',
+  handicrafts: '#262674',
+  character_design: '#004645',
+  color_expression: '#B86A22',
+};
+
+export type SubjectTone = { base: string; ink: string; tint: string };
+
+export function subjectTone(id: string): SubjectTone {
+  const ink = SUBJECT_INK[id] ?? c.primary;
+  return { base: subjectColor(id), ink, tint: ink + '1A' };
+}
+
+export default { BRAND, c, sp, rad, fnt, fs, lh, sh, GRAD, kindTone, levelTone, scaleTone, scaleBg, scaleFg, PRINT, ORG, GRADE_COLORS, GRADE_TONES, gradeTone, gradeColor, SUBJECT_COLORS, subjectColor, subjectTone };
