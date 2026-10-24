@@ -384,8 +384,10 @@ export type GradeTone = {
   base: string;
   /** نهاية التدرج خلف base */
   deep: string;
-  /** خلفية بلاطات الأيقونات والشرائح غير المحددة */
+  /** خلفية بلاطات الأيقونات والشرائح غير المحددة (شفافة فوق الصورة) */
   tint: string;
+  /** نفس درجة tint لكن معتمة فوق الأبيض — لأسطح تحمل نصاً فوق صورة */
+  chipBg: string;
   /** نص مقروء فوق base */
   onBase: string;
   /** نص ثانوي فوق base */
@@ -394,19 +396,19 @@ export type GradeTone = {
 
 export const GRADE_TONES: Record<string, GradeTone> = {
   grade4: {
-    base: '#004645', deep: '#003635', tint: 'rgba(0, 70, 69, 0.10)',
+    base: '#004645', deep: '#003635', tint: 'rgba(0, 70, 69, 0.10)', chipBg: '#E6EDEC',
     onBase: '#FFFFFF', onBaseMuted: 'rgba(255, 255, 255, 0.78)',
   },
   grade5: {
-    base: '#621244', deep: '#4A0D33', tint: 'rgba(98, 18, 68, 0.10)',
+    base: '#621244', deep: '#4A0D33', tint: 'rgba(98, 18, 68, 0.10)', chipBg: '#EFE7EC',
     onBase: '#FFFFFF', onBaseMuted: 'rgba(255, 255, 255, 0.78)',
   },
   grade_int1: {
-    base: '#83C3EB', deep: '#262674', tint: 'rgba(131, 195, 235, 0.18)',
+    base: '#83C3EB', deep: '#262674', tint: 'rgba(131, 195, 235, 0.18)', chipBg: '#E9F4FB',
     onBase: '#171717', onBaseMuted: 'rgba(23, 23, 23, 0.72)',
   },
   grade_int2: {
-    base: '#D17E30', deep: '#B86A22', tint: 'rgba(209, 126, 48, 0.14)',
+    base: '#D17E30', deep: '#B86A22', tint: 'rgba(209, 126, 48, 0.14)', chipBg: '#F9EDE2',
     onBase: '#171717', onBaseMuted: 'rgba(23, 23, 23, 0.85)',
   },
 };

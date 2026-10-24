@@ -130,7 +130,14 @@ export default function TermScreen() {
                 <Pressable
                   key={t.id}
                   onPress={() => setTerm(t.id)}
-                  style={({ pressed }) => [s.termChip, { borderColor: tone.base }, on ? { backgroundColor: tone.base, shadowOpacity: 0.2, elevation: 3 } : { backgroundColor: tone.tint }, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
+                  style={({ pressed }) => [
+                    s.termChip,
+                    { borderColor: tone.base },
+                    on
+                      ? { backgroundColor: tone.base, shadowOpacity: 0.2, elevation: 3 }
+                      : { backgroundColor: tone.chipBg, elevation: 0 },
+                    pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
+                  ]}
                   accessibilityRole="button"
                 >
                   <Text style={[s.termText, on && { color: tone.onBase }]}>{t.name}</Text>
@@ -229,8 +236,9 @@ const s = StyleSheet.create({
 
   /* Term chips */
   termRow: { flexDirection: 'row', gap: sp.sm },
+  /** elevation تُضاف للمحدد فقط: الظل خلف سطح شفاف يظهر ككتلة رمادية على أندرويد */
   termChip: { flex: 1, paddingVertical: sp.md, paddingHorizontal: sp.md, borderRadius: rad.lg, gap: 2, borderWidth: 1,
-    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 1 },
+    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 8 },
   termText: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
   termSub: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3 },
   termCheck: { position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
