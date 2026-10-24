@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { CriteriaKind } from '@/constants/criteria.data';
 import type { GradeId, SubjectId, TermId } from '@/constants/criteria';
-import { subjectsForGrade, formTotals } from '@/constants/criteria';
+import { subjectsForGrade, formTotals, EVAL_KINDS } from '@/constants/criteria';
 import {
   unitCount, unitLabel, plannedLabel, plannedId, unitFromLabel,
   PERIODIC_LABEL, FINAL_LABEL,
@@ -481,7 +481,11 @@ export async function deleteStudent(id: string): Promise<void> {
 
 export async function listEvaluations(includeDeleted = false): Promise<Evaluation[]> {
   const all = await read<Evaluation[]>(K.evaluations, []);
-  return includeDeleted ? all : all.filter((e) => !e.deleted);
+  // تجاهل أي سجل تالف أو بنوع تقييم غير معروف حتى لا يُسقط شاشة السجل.
+  const valid = all.filter(
+    (e) => !!e && EVAL_KINDS.some((k) => k.id === e.evaluation_type)
+  );
+  return includeDeleted ? valid : valid.filter((e) => !e.deleted);
 }
 
 export async function evaluationsForStudent(studentId: string): Promise<Evaluation[]> {

@@ -402,7 +402,9 @@ export function formTotals(
   const criteria = resolveCriteria(kind, gradeId, subjectId, term);
   const actualMax = criteria.reduce((s, c) => s + c.max, 0);
   const passMax = criteria.reduce((s, c) => s + (c.pass ?? 0), 0);
-  const officialMax = kindMeta(kind).officialMax;
+  // نوع غير معروف (سجل قديم/تالف) لا يجب أن يُسقط الشاشة.
+  const meta = EVAL_KINDS.find((k) => k.id === kind);
+  const officialMax = meta ? meta.officialMax : actualMax;
   return { criteria, actualMax, officialMax, delta: actualMax - officialMax, passMax };
 }
 
