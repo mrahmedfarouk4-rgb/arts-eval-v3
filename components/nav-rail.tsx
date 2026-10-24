@@ -2,7 +2,7 @@ import React, {
   createContext, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Dimensions, ScrollView, Platform, Animated, Easing,
+  View, Text, StyleSheet, Pressable, ScrollView, Platform, Animated, Easing, BackHandler, useWindowDimensions,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { c, sp, rad, fnt, fs, sh, BRAND } from '@/constants/brand';
 import { EMBLEM, HorizontalLogo } from '@/constants/logo';
 import { useAuth } from '@/lib/auth';
-
-const { width: W } = Dimensions.get('window');
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -24,8 +22,8 @@ export const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
 ];
 
 const RAIL_W = 72;
-/** الدرج يترك هامشاً من الخلفية حتى يُقرأ كطبقة فوقية لا كشاشة بديلة */
-const DRAWER_W = Math.min(320, Math.round(W * 0.86));
+/** أقصى عرض للدرج — العرض الفعلي يُحسب من أبعاد النافذة وقت العرض */
+const DRAWER_MAX_W = 320;
 const NATIVE_DRIVER = Platform.OS !== 'web';
 /** العتمة تتلاشى، فلا بد من مكوّن متحرّك — opacity في Pressable عادي تُتجاهل */
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -171,9 +169,24 @@ export function NavDrawer() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { user, authenticated, logout } = useAuth();
+  const { width, height } = useWindowDimensions();
   const [mounted, setMounted] = useState(open);
   // 0 = مطويّ خارج يمين الشاشة، 1 = مفتوح بالكامل
   const slide = useRef(new Animated.Value(open ? 1 : 0)).current;
+
+  /** قياسات حيّة: الهواتف القصيرة تحصل على تباعد مضغوط بدل قصّ المحتوى */
+  const drawerW = Math.min(DRAWER_MAX_W, Math.round(width * 0.86));
+  const compact = height < 860;
+
+  // زر الرجوع في أندرويد يغلق الدرج بدل مغادرة الشاشة
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !open) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeDrawer();
+      return true;
+    });
+    return () => sub.remove();
+  }, [open, closeDrawer]);
 
   useEffect(() => {
     if (open) setMounted(true);
@@ -218,20 +231,21 @@ export function NavDrawer() {
         style={[
           s.drawer,
           {
-            width: DRAWER_W,
+            width: drawerW,
             paddingTop: insets.top,
             paddingBottom: insets.bottom,
             transform: [{
               translateX: slide.interpolate({
                 inputRange: [0, 1],
-                outputRange: [`${DRAWER_W}px`, '0px'],
+                // أرقام لا نصوص: '320px' لا تدعمها حركة المحرّك الأصلي على أندرويد
+                outputRange: [drawerW, 0],
               }),
             }],
           },
         ]}
       >
         <View style={[s.drawerInner, RTL]}>
-          <View style={s.drawerHead}>
+          <View style={[s.drawerHead, compact && s.drawerHeadCompact]}>
             <View style={{ flex: 1 }}>
               <Text style={s.drawerTitle}>القائمة</Text>
               <Text style={s.drawerSub} numberOfLines={1}>{BRAND.academy}</Text>
@@ -241,16 +255,26 @@ export function NavDrawer() {
             </Pressable>
           </View>
 
-          <View style={s.drawerRule} />
+          <View style={[s.drawerRule, compact && s.drawerRuleCompact]} />
 
-          <ScrollView style={s.drawerScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={s.drawerScroll}
+            contentContainerStyle={s.drawerScrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
             {NAV_ITEMS.map((item, i) => {
               const on = isActiveHref(pathname, item.href);
               return (
                 <Pressable
                   key={item.href}
                   onPress={() => go(item.href)}
-                  style={({ pressed }) => [s.drawerItem, on && s.drawerItemOn, pressed && { opacity: 0.75 }]}
+                  style={({ pressed }) => [
+                    s.drawerItem,
+                    compact && s.drawerItemCompact,
+                    on && s.drawerItemOn,
+                    pressed && { opacity: 0.75 },
+                  ]}
                   accessibilityRole="menuitem"
                 >
                   <View style={[s.drawerIcon, on && { backgroundColor: c.white }]}>
@@ -262,11 +286,11 @@ export function NavDrawer() {
               );
             })}
 
-            <View style={s.drawerRule} />
+            <View style={[s.drawerRule, compact && s.drawerRuleCompact]} />
 
             <Pressable
               onPress={() => go('/info')}
-              style={({ pressed }) => [s.drawerItem, pressed && { opacity: 0.75 }]}
+              style={({ pressed }) => [s.drawerItem, compact && s.drawerItemCompact, pressed && { opacity: 0.75 }]}
               accessibilityRole="menuitem"
             >
               <View style={s.drawerIcon}>
@@ -276,7 +300,7 @@ export function NavDrawer() {
             </Pressable>
             <Pressable
               onPress={() => go('/print')}
-              style={({ pressed }) => [s.drawerItem, pressed && { opacity: 0.75 }]}
+              style={({ pressed }) => [s.drawerItem, compact && s.drawerItemCompact, pressed && { opacity: 0.75 }]}
               accessibilityRole="menuitem"
             >
               <View style={s.drawerIcon}>
@@ -285,12 +309,17 @@ export function NavDrawer() {
               <Text style={s.drawerLabel}>الطباعة</Text>
             </Pressable>
 
-            <View style={s.drawerRule} />
+            <View style={[s.drawerRule, compact && s.drawerRuleCompact]} />
 
             {/* الخروج */}
             <Pressable
               onPress={onLogout}
-              style={({ pressed }) => [s.drawerItem, s.drawerItemOut, pressed && { opacity: 0.75 }]}
+              style={({ pressed }) => [
+                s.drawerItem,
+                compact && s.drawerItemCompact,
+                s.drawerItemOut,
+                pressed && { opacity: 0.75 },
+              ]}
               accessibilityRole="menuitem"
               accessibilityLabel="تسجيل الخروج"
             >
@@ -302,28 +331,32 @@ export function NavDrawer() {
               </Text>
               <Ionicons name="chevron-back" size={15} color={c.text4} />
             </Pressable>
-          </ScrollView>
 
-          <View style={s.drawerFoot}>
-            <View style={s.drawerUser}>
-              <View style={[s.drawerIcon, { width: 30, height: 30, backgroundColor: c.white }]}>
-                <Ionicons
-                  name={authenticated ? 'person-circle-outline' : 'person-outline'}
-                  size={17}
-                  color={c.primary}
-                />
+            {/* الفوتر داخل التمرير: الشاشات القصيرة تُمرّره بدل قصّه */}
+            <View style={[s.drawerFoot, compact && s.drawerFootCompact]}>
+              <View style={s.drawerUser}>
+                <View style={[s.drawerIcon, { width: 30, height: 30, backgroundColor: c.white }]}>
+                  <Ionicons
+                    name={authenticated ? 'person-circle-outline' : 'person-outline'}
+                    size={17}
+                    color={c.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.drawerUserName} numberOfLines={1}>
+                    {user?.username ?? 'ضيف'}
+                  </Text>
+                  <Text style={s.drawerUserRole}>
+                    {authenticated ? 'معلّم مصادق' : 'وضع الضيف'}
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.drawerUserName} numberOfLines={1}>
-                  {user?.username ?? 'ضيف'}
-                </Text>
-                <Text style={s.drawerUserRole}>
-                  {authenticated ? 'معلّم مصادق' : 'وضع الضيف'}
-                </Text>
-              </View>
+              <HorizontalLogo
+                style={[s.drawerLogo, compact && s.drawerLogoCompact]}
+                resizeMode="contain"
+              />
             </View>
-            <HorizontalLogo style={s.drawerLogo} resizeMode="contain" />
-          </View>
+          </ScrollView>
         </View>
       </Animated.View>
     </View>
@@ -419,6 +452,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm,
     paddingHorizontal: sp.xs, paddingTop: sp.md,
   },
+  drawerHeadCompact: { paddingTop: sp.sm },
   drawerTitle: { fontFamily: fnt.eb, fontSize: fs.xl, color: c.text },
   drawerSub: { fontFamily: fnt.r, fontSize: fs.xs, color: c.text3, marginTop: 2 },
   drawerClose: {
@@ -427,7 +461,10 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   drawerRule: { height: 1, backgroundColor: c.line, marginVertical: sp.md },
+  drawerRuleCompact: { marginVertical: sp.sm },
   drawerScroll: { flex: 1 },
+  /** flexGrow يجعل الفوتر يلتصق بالأسفل عندما يكون المحتوى أقصر من الشاشة */
+  drawerScrollContent: { flexGrow: 1 },
 
   drawerItem: {
     flexDirection: 'row', alignItems: 'center', gap: sp.sm,
@@ -435,6 +472,7 @@ const s = StyleSheet.create({
     borderRadius: rad.md,
     marginBottom: 2,
   },
+  drawerItemCompact: { paddingVertical: sp.sm },
   drawerItemOn: { backgroundColor: c.primaryBg },
   drawerItemOut: { backgroundColor: c.errBg },
   drawerIcon: {
@@ -448,9 +486,10 @@ const s = StyleSheet.create({
   drawerFoot: {
     alignItems: 'center',
     paddingTop: sp.md,
-    marginTop: sp.sm,
+    marginTop: 'auto',
     borderTopWidth: 1, borderTopColor: c.line,
   },
+  drawerFootCompact: { paddingTop: sp.sm },
   drawerUser: {
     alignSelf: 'stretch',
     flexDirection: 'row', alignItems: 'center', gap: sp.sm,
@@ -462,4 +501,5 @@ const s = StyleSheet.create({
   drawerUserName: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text },
   drawerUserRole: { fontFamily: fnt.r, fontSize: 9, color: c.text3, marginTop: 1 },
   drawerLogo: { width: 180, height: 53 },
+  drawerLogoCompact: { width: 150, height: 44 },
 });
