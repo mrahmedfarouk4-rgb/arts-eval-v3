@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, ScrollView, Image, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,9 +8,9 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import {
   GRADES, subjectsForGrade, gradeName, CRITERIA_COUNT,
 } from '@/constants/criteria';
-import { c, sp, rad, fnt, fs } from '@/constants/brand';
+import { c, sp, rad, fnt, fs, gradeTone } from '@/constants/brand';
 import {
-  Tile, WeekStrip,
+  Tile, WeekStrip, ar,
   type WeekDay,
 } from '@/components/pro-ui';
 import { useSession } from '@/lib/session';
@@ -39,8 +39,6 @@ const rangeLabel = () => {
   return `${start.getDate()} ${MONTHS[start.getMonth()]} – ${end.getDate()} ${MONTHS[end.getMonth()]}`;
 };
 
-const GRADE_COLORS = ['#004645', '#621244', '#83C3EB', '#D17E30', '#83D5C4', '#E5A1C8'];
-
 export default function GradesScreen() {
   const router = useRouter();
   const { setGrade, resetFlow } = useSession();
@@ -48,6 +46,9 @@ export default function GradesScreen() {
   const [evals, setEvals] = useState<Evaluation[]>([]);
   const [students, setStudents] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const stagesY = useRef(0);
 
   const reload = useCallback(async () => {
     try {
@@ -90,38 +91,46 @@ export default function GradesScreen() {
     setGrade(gradeId as never);
     router.push('/term' as never);
   };
-  const reset = () => {
-    resetFlow();
-    router.push('/' as never);
-  };
 
+  /** بدء تقييم جديد: تصفير الاختيارات ثم الانتقال إلى قائمة المراحل */
+  const startEvaluation = useCallback(() => {
+    resetFlow();
+    scrollRef.current?.scrollTo({ y: Math.max(0, stagesY.current - sp.md), animated: true });
+  }, [resetFlow]);
+
+  /** الإجراء الأساسي واحد (زرّ معبّأ)، والبقية بلاطات بيضاء بلون أيقونتها */
   const ACTIONS = [
-    { label: 'ابدأ تقييماً', icon: 'play', color: c.primary, onPress: reset },
-    { label: 'أضف طالباً', icon: 'person-add-outline', color: c.brandSecondary, onPress: () => router.push('/students' as never) },
-    { label: 'السجل', icon: 'albums-outline', color: c.orange, onPress: () => router.push('/records' as never) },
-    { label: 'استمارة', icon: 'print-outline', color: c.mint, onPress: () => router.push('/samples' as never) },
+    { label: 'أضف طالباً', sub: 'بيانات الطالب', icon: 'person-add-outline', ink: c.brandSecondary, tint: 'rgba(98, 18, 68, 0.10)', onPress: () => router.push('/students' as never) },
+    { label: 'السجل', sub: 'تقييمات سابقة', icon: 'albums-outline', ink: c.blueDeep, tint: 'rgba(38, 38, 116, 0.10)', onPress: () => router.push('/records' as never) },
+    { label: 'استمارة', sub: 'نماذج A4', icon: 'print-outline', ink: c.warmInk, tint: c.accentBg, onPress: () => router.push('/samples' as never) },
   ];
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Image source={require('@/assets/brand/bg-main.jpg')} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(250,250,250,0.78)' }]} />
+        <Image
+          source={require('@/assets/brand/bg-school-gate.jpg')}
+          style={s.bgPhoto}
+          resizeMode="cover"
+        />
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(250,250,250,0.87)' }]} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* ===== Hero ===== */}
         <Animated.View entering={FadeIn.duration(700)} style={s.hero}>
-          <Image source={require('@/assets/brand/bg-teal-dark.jpg')} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-          <LinearGradient colors={['rgba(0,70,69,0.20)', 'rgba(0,70,69,0.95)']} style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={[c.primarySoft, c.primary]}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
           <View style={s.heroContent}>
-            <View style={s.heroTop}>
+            <View style={s.heroBrand}>
               <Text style={s.heroEyebrow}>أكاديمية آفاق · الفنون البصرية</Text>
-              <Text style={s.heroEyebrowEn}>AFAC — Fine Arts & Culture</Text>
+              <Text style={s.heroEyebrowEn}>AFAC — Fine Arts &amp; Culture</Text>
             </View>
-            <Text style={s.heroTitle}>تقييم.</Text>
-            <Text style={s.heroTitle}>إبداع.</Text>
-            <Text style={s.heroTitle}>تألق.</Text>
+            <Text style={s.heroTitle}>تقييم. إبداع. تألق.</Text>
             <Text style={s.heroSub}>لوحة عمل المعلّم — كل ما تحتاجه بنظرة واحدة</Text>
             <View style={s.heroStats}>
               <View style={s.heroStat}>
@@ -140,23 +149,45 @@ export default function GradesScreen() {
               </View>
               <View style={s.heroDivider} />
               <View style={s.heroStat}>
-                <Text style={s.heroStatValue}>{Math.round(week.pct * 100)}٪</Text>
+                <Text style={s.heroStatValue}>{week.inWeek ? `${ar(Math.round(week.pct * 100))}٪` : '—'}</Text>
                 <Text style={s.heroStatLabel}>إنجاز</Text>
               </View>
             </View>
           </View>
         </Animated.View>
 
-        {/* ===== Quick actions (colorful cards) ===== */}
-        <Animated.View entering={FadeInDown.delay(120).duration(500)}>
+        {/* ===== Quick actions ===== */}
+        <Animated.View entering={FadeInDown.delay(120).duration(500)} style={s.actionsBlock}>
           <Text style={s.sectionTitle}>ابدأ بسرعة</Text>
+          <Pressable
+            onPress={startEvaluation}
+            style={({ pressed }) => [s.primaryAction, pressed && { transform: [{ scale: 0.985 }], opacity: 0.92 }]}
+            accessibilityRole="button"
+            accessibilityLabel="ابدأ تقييماً جديداً"
+          >
+            <LinearGradient colors={[c.primary, c.primaryHi]} style={StyleSheet.absoluteFill} />
+            <View style={s.primaryActionIc}>
+              <Ionicons name="play" size={19} color={c.onPrimary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.primaryActionLabel}>ابدأ تقييماً</Text>
+              <Text style={s.primaryActionSub}>المرحلة ← المقرر ← الدرجات</Text>
+            </View>
+            <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.85)" />
+          </Pressable>
           <View style={s.actionGrid}>
-            {ACTIONS.map((a, i) => (
-              <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [s.actionCardSolid, { backgroundColor: a.color }, pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 }]} accessibilityRole="button">
-                <View style={s.actionIconWrapSolid}>
-                  <Ionicons name={a.icon as any} size={22} color="#FFFFFF" />
+            {ACTIONS.map((a) => (
+              <Pressable
+                key={a.label}
+                onPress={a.onPress}
+                style={({ pressed }) => [s.actionCard, pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 }]}
+                accessibilityRole="button"
+              >
+                <View style={[s.actionIconWrap, { backgroundColor: a.tint }]}>
+                  <Ionicons name={a.icon as any} size={19} color={a.ink} />
                 </View>
-                <Text style={s.actionLabelSolid}>{a.label}</Text>
+                <Text style={s.actionLabel} numberOfLines={1}>{a.label}</Text>
+                <Text style={s.actionSub} numberOfLines={1}>{a.sub}</Text>
               </Pressable>
             ))}
           </View>
@@ -164,15 +195,22 @@ export default function GradesScreen() {
 
         {/* ===== الأسبوع ===== */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Tile wide bg={require('@/assets/brand/bg-warm-light.jpg')} title={`الأسبوع ${weekNo()} · ${rangeLabel()}`}>
+          <Tile wide bg={require('@/assets/brand/bg-warm-light.jpg')} title={`الأسبوع ${ar(weekNo())} · ${ar(rangeLabel())}`}>
             <WeekStrip days={week.days} />
-            <View style={s.meterRow}>
-              <Text style={s.meterText}>{week.doneWeek} من {week.inWeek} مكتملة</Text>
-              <View style={s.meterTrack}>
-                <View style={[s.meterFill, { width: `${Math.round(week.pct * 100)}%` }]} />
+            {week.inWeek === 0 ? (
+              <View style={s.weekEmpty}>
+                <Ionicons name="calendar-outline" size={14} color={c.text3} />
+                <Text style={s.meterText}>لا تقييمات هذا الأسبوع بعد</Text>
               </View>
-              <Text style={s.meterText}>{Math.round(week.pct * 100)}٪</Text>
-            </View>
+            ) : (
+              <View style={s.meterRow}>
+                <Text style={s.meterText}>{ar(week.doneWeek)} من {ar(week.inWeek)} مكتملة</Text>
+                <View style={s.meterTrack}>
+                  <View style={[s.meterFill, { width: `${Math.round(week.pct * 100)}%` }]} />
+                </View>
+                <Text style={s.meterText}>{ar(Math.round(week.pct * 100))}٪</Text>
+              </View>
+            )}
           </Tile>
         </Animated.View>
 
@@ -183,7 +221,7 @@ export default function GradesScreen() {
             {[
               { n: '١', t: 'اختر المرحلة', d: 'ابتدائي · متوسط', c: c.primary },
               { n: '٢', t: 'اختر المقرر', d: 'فصل · مقرر · نوع', c: c.brandSecondary },
-              { n: '٣', t: 'قيّم', d: '٥–١٥ بند', c: c.orange },
+              { n: '٣', t: 'قيّم', d: '٥–١٥ بند', c: c.warmInk },
             ].map((st) => (
               <View key={st.n} style={[s.stepCard, { borderTopColor: st.c }]}>
                 <Text style={[s.stepNum, { color: st.c }]}>{st.n}</Text>
@@ -195,30 +233,32 @@ export default function GradesScreen() {
         </Animated.View>
 
         {/* ===== المراحل ===== */}
-        <Animated.Text entering={FadeInDown.delay(360).duration(500)} style={s.sectionTitle}>اختر المرحلة</Animated.Text>
-        <View style={{ gap: sp.sm }}>
-          {GRADES.filter((g) => g.id !== 'intermediate1').map((g, i) => {
-            const n1 = subjectsForGrade(g.id, 'term1').length;
-            const n2 = subjectsForGrade(g.id, 'term2').length;
-            const color = GRADE_COLORS[i % GRADE_COLORS.length];
-            return (
-              <Animated.View key={g.id} entering={FadeInDown.delay(420 + i * 60).duration(500)}>
-                <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
-                  <View style={[s.gradeAccent, { backgroundColor: color }]} />
-                  <View style={[s.gradeIc, { backgroundColor: color + '18' }]}>
-                    <Ionicons name="school-outline" size={18} color={color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.gradeName}>{gradeName(g.id)}</Text>
-                    <Text style={s.gradeMeta}>ف١ · {ar(n1)} مقررات · ف٢ · {ar(n2)} مقررات</Text>
-                  </View>
-                  <View style={[s.gradeArrow, { backgroundColor: color + '14' }]}>
-                    <Ionicons name="chevron-back" size={16} color={color} />
-                  </View>
-                </Pressable>
-              </Animated.View>
-            );
-          })}
+        <View onLayout={(e) => { stagesY.current = e.nativeEvent.layout.y; }}>
+          <Animated.Text entering={FadeInDown.delay(360).duration(500)} style={s.sectionTitle}>اختر المرحلة</Animated.Text>
+          <View style={{ gap: sp.sm }}>
+            {GRADES.filter((g) => g.id !== 'intermediate1').map((g, i) => {
+              const n1 = subjectsForGrade(g.id, 'term1').length;
+              const n2 = subjectsForGrade(g.id, 'term2').length;
+              const tone = gradeTone(g.id);
+              return (
+                <Animated.View key={g.id} entering={FadeInDown.delay(420 + i * 60).duration(500)}>
+                  <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
+                    <View style={[s.gradeAccent, { backgroundColor: tone.base }]} />
+                    <View style={[s.gradeIc, { backgroundColor: tone.tint }]}>
+                      <Ionicons name="school-outline" size={18} color={tone.deep} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.gradeName}>{gradeName(g.id)}</Text>
+                      <Text style={s.gradeMeta}>ف١ · {ar(n1)} مقررات · ف٢ · {ar(n2)} مقررات</Text>
+                    </View>
+                    <View style={[s.gradeArrow, { backgroundColor: tone.tint }]}>
+                      <Ionicons name="chevron-back" size={16} color={tone.deep} />
+                    </View>
+                  </Pressable>
+                </Animated.View>
+              );
+            })}
+          </View>
         </View>
 
         {/* ===== CTA banner ===== */}
@@ -227,8 +267,8 @@ export default function GradesScreen() {
           <LinearGradient colors={['rgba(0,70,69,0.55)', 'rgba(0,70,69,0.92)']} style={StyleSheet.absoluteFill} />
           <View style={s.ctaBannerContent}>
             <Text style={s.ctaBannerTitle}>جاهز لتقييم إبداعاتك؟</Text>
-            <Text style={s.ctaBannerSub}>ابدأ الآن — ٤ مراحل · ٧ مقررات · ٥٩٢ بند</Text>
-            <Pressable onPress={reset} style={({ pressed }) => [s.ctaBannerBtn, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]} accessibilityRole="button">
+            <Text style={s.ctaBannerSub}>ابدأ الآن — ٤ مراحل · {ar(subjectTotal)} مقررات · {ar(CRITERIA_COUNT)} بند</Text>
+            <Pressable onPress={startEvaluation} style={({ pressed }) => [s.ctaBannerBtn, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]} accessibilityRole="button">
               <LinearGradient colors={[c.primary, c.primaryHi]} style={s.ctaBannerBtnGrad}>
                 <Text style={s.ctaBannerBtnText}>ابدأ تقييماً</Text>
                 <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
@@ -237,13 +277,12 @@ export default function GradesScreen() {
           </View>
         </Animated.View>
 
-
         {/* ===== FAQ ===== */}
         <Animated.View entering={FadeInDown.delay(600).duration(500)}>
           <Text style={s.sectionTitle}>أسئلة شائعة</Text>
           <View style={{ gap: sp.sm }}>
             {[
-              { q: 'ما هي منصة تقييم الفنون البصرية؟', a: 'نظام لتقييم وملاحظة الأداء الفني للطلاب (٤–٨) across ٧ مقررات و٥٩٢ بند.' },
+              { q: 'ما هي منصة تقييم الفنون البصرية؟', a: 'نظام لتقييم وملاحظة الأداء الفني للطلاب (٤–٨) عبر ٨ مقررات و٥٩٢ بند.' },
               { q: 'كيف أبدأ تقييماً؟', a: 'اختر المرحلة → الفصل → المقرر → نوع التقييم → أدخل الدرجات → اطبع.' },
               { q: 'هل يمكن طباعة الاستمارات؟', a: 'نعم — نماذج A4 (٢١٠×٢٩٧) جاهزة للطباعة من شاشة "نماذج".' },
               { q: 'من يمكنه الدخول؟', a: 'المشرف (admin) والمعلمون (باسمهم وكلمة سرهم) والضيوف (نماذج فقط).' },
@@ -279,7 +318,7 @@ export default function GradesScreen() {
         </Animated.View>
 
         {/* ===== FAB ===== */}
-        <Pressable onPress={reset} style={s.fab} accessibilityRole="button">
+        <Pressable onPress={startEvaluation} style={s.fab} accessibilityRole="button" accessibilityLabel="ابدأ تقييماً">
           <LinearGradient colors={[c.primary, c.primaryHi]} style={s.fabGrad}>
             <Ionicons name="add" size={26} color="#FFFFFF" />
           </LinearGradient>
@@ -289,57 +328,60 @@ export default function GradesScreen() {
   );
 }
 
-const ar = (n: number | string) =>
-  String(n ?? '').replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
-
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg, overflow: 'hidden' },
+  bgPhoto: { position: 'absolute', top: 0, left: 0, right: 0, height: '116%' },
   scroll: { padding: sp.md, paddingBottom: 110, gap: sp.md },
 
-  /* Hero */
-  hero: { height: 230, borderRadius: rad.xl, overflow: 'hidden', marginBottom: sp.xs,
+  /* Hero — ارتفاعه حسب محتواه حتى لا تُقصّ صفوف الإحصاء */
+  hero: { borderRadius: rad.xl, overflow: 'hidden',
     shadowColor: c.primary, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 28, elevation: 8 },
-  heroContent: { flex: 1, padding: sp.lg, justifyContent: 'space-between' },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
-  heroEyebrow: { fontFamily: fnt.m, fontSize: 10.5, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 },
-  heroEyebrowEn: { fontFamily: fnt.m, fontSize: 9.5, color: 'rgba(255,255,255,0.7)', marginLeft: sp.xs },
-  heroTitle: { fontFamily: fnt.bk, fontSize: 40, color: '#FFFFFF', letterSpacing: -1, lineHeight: 42, marginTop: 4 },
-  heroSub: { fontFamily: fnt.r, fontSize: fs.xs, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  heroStats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: rad.md, paddingVertical: sp.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', marginTop: sp.sm },
+  heroContent: { padding: sp.lg, gap: sp.xs },
+  heroBrand: { gap: 1 },
+  heroEyebrow: { fontFamily: fnt.m, fontSize: 10.5, color: 'rgba(255,255,255,0.9)' },
+  heroEyebrowEn: { fontFamily: fnt.m, fontSize: 9.5, color: 'rgba(255,255,255,0.68)', letterSpacing: 0.3 },
+  heroTitle: { fontFamily: fnt.bk, fontSize: 28, color: '#FFFFFF', letterSpacing: -0.5, lineHeight: 34, marginTop: sp.xs },
+  heroSub: { fontFamily: fnt.r, fontSize: fs.xs, color: 'rgba(255,255,255,0.84)' },
+  heroStats: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: rad.md, paddingVertical: sp.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', marginTop: sp.xs },
   heroStat: { alignItems: 'center', flex: 1 },
   heroStatValue: { fontFamily: fnt.bk, fontSize: fs.lg, color: '#FFFFFF', letterSpacing: -0.5 },
   heroStatLabel: { fontFamily: fnt.r, fontSize: 9, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
-  heroDivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.25)' },
+  heroDivider: { width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.25)' },
 
   sectionTitle: { fontFamily: fnt.b, fontSize: fs.md, color: c.text, marginTop: sp.sm, marginBottom: 2, paddingHorizontal: 2 },
 
-  /* Quick actions grid */
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
-  actionCardSolid: { width: '47.6%', borderRadius: rad.lg, padding: sp.md, gap: sp.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    shadowColor: c.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.20, shadowRadius: 16, elevation: 5 },
-  actionIconWrapSolid: { width: 42, height: 42, borderRadius: rad.md, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' },
-  actionLabelSolid: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
+  /* Quick actions — إجراء أساسي واحد + ثلاث بلاطات بيضاء */
+  actionsBlock: { gap: sp.sm },
+  primaryAction: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
+    shadowColor: c.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.24, shadowRadius: 20, elevation: 6 },
+  primaryActionIc: { width: 40, height: 40, borderRadius: rad.md, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' },
+  primaryActionLabel: { fontFamily: fnt.b, fontSize: fs.md, color: '#FFFFFF' },
+  primaryActionSub: { fontFamily: fnt.r, fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+  actionGrid: { flexDirection: 'row', gap: sp.sm },
+  actionCard: { flex: 1, backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.line, padding: sp.md, gap: sp.xs,
+    shadowColor: c.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2 },
+  actionIconWrap: { width: 36, height: 36, borderRadius: rad.sm, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text },
+  actionSub: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3 },
 
-  row: { flexDirection: 'row', gap: sp.md },
-  big: { fontFamily: fnt.bk, fontSize: 30, color: c.primary, letterSpacing: -0.8, lineHeight: 34 },
-  note: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 2 },
-
-  meterRow: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginTop: 2 },
+  meterRow: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
   meterText: { fontFamily: fnt.m, fontSize: 10, color: c.text3 },
   meterTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: c.meterTrack, overflow: 'hidden' },
   meterFill: { height: '100%', backgroundColor: c.primary, borderRadius: 3 },
+  weekEmpty: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.xs },
 
-  /* How it works */
+  /* How it works — ترقيم العربية والرقم على حافة واحدة */
   stepsRow: { flexDirection: 'row', gap: sp.sm },
-  stepCard: { flex: 1, backgroundColor: c.tileBg, borderRadius: rad.md, borderWidth: 1, borderColor: c.tileBorder, borderTopWidth: 3, padding: sp.md, gap: 4,
+  stepCard: { flex: 1, backgroundColor: c.tileBg, borderRadius: rad.md, borderWidth: 1, borderColor: c.tileBorder, borderTopWidth: 3, padding: sp.md, gap: 3,
     shadowColor: c.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2 },
-  stepNum: { fontFamily: fnt.bk, fontSize: fs.xl, letterSpacing: -0.5 },
-  stepTitle: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text },
-  stepDesc: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3 },
+  stepNum: { fontFamily: fnt.bk, fontSize: fs.xl, letterSpacing: -0.5, textAlign: 'right' },
+  stepTitle: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text, textAlign: 'right' },
+  stepDesc: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3, textAlign: 'right' },
 
-  /* Grade rows */
-  gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden', backgroundColor: '#FFFFFF',
-    shadowColor: c.text, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: c.line },
+  /* Grade rows — بطاقة بيضاء وشريط بلون المرحلة على حافة السهم */
+  gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
+    backgroundColor: c.tileBg, borderWidth: 1, borderColor: c.line,
+    shadowColor: c.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2 },
   gradeAccent: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 6, borderTopRightRadius: rad.lg, borderBottomRightRadius: rad.lg },
   gradeIc: { width: 42, height: 42, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
   gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
@@ -355,11 +397,6 @@ const s = StyleSheet.create({
   ctaBannerBtn: { alignSelf: 'flex-start', borderRadius: rad.pill, overflow: 'hidden', marginTop: sp.xs },
   ctaBannerBtnGrad: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingHorizontal: sp.lg, paddingVertical: 10 },
   ctaBannerBtnText: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
-
-  /* Gallery */
-  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
-  galleryItem: { width: '31.5%', aspectRatio: 1, borderRadius: rad.md, overflow: 'hidden', justifyContent: 'flex-end', padding: sp.xs },
-  galleryLabel: { fontFamily: fnt.b, fontSize: 10, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   /* FAQ */
   faqCard: { backgroundColor: c.tileBg, borderRadius: rad.md, borderWidth: 1, borderColor: c.tileBorder, padding: sp.md, gap: sp.xs },
