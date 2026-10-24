@@ -102,9 +102,9 @@ export default function RosterScreen() {
         <View style={s.statBar}>
           <Stat value={students.length} label="طالب" />
           <View style={s.vRule} />
-          <Stat value={filled} label="استمارة مُعبّأة" color={c.ok} />
+          <Stat value={filled} label="استمارة مُعبّأة" color={c.okText} />
           <View style={s.vRule} />
-          <Stat value={allForms.length - filled} label="بانتظار المعلم" color={c.warn} />
+          <Stat value={allForms.length - filled} label="بانتظار المعلم" color={c.warnText} />
         </View>
 
         {/* بحث */}
@@ -173,7 +173,7 @@ export default function RosterScreen() {
                       ]}
                     >
                       <Text
-                        style={[s.avatarText, doneCount > 0 && { color: c.ok }]}
+                        style={[s.avatarText, doneCount > 0 && { color: c.okText }]}
                       >
                         {stu.name.charAt(0)}
                       </Text>
@@ -181,7 +181,7 @@ export default function RosterScreen() {
 
                     <View style={{ flex: 1 }}>
                       <Text style={s.name} numberOfLines={1}>{stu.name}</Text>
-                      <Text style={[s.sub, doneCount === 0 && { color: c.warn }]}>
+                      <Text style={[s.sub, doneCount === 0 && { color: c.warnText }]}>
                         {doneCount === 0
                           ? `${forms.length} استمارة جاهزة · لم يُقيَّم`
                           : `${doneCount} من ${forms.length} استمارة معبّأة`}
@@ -189,7 +189,7 @@ export default function RosterScreen() {
                     </View>
 
                     {doneCount > 0 && (
-                      <Badge label={`${doneCount}/${forms.length}`} color={c.ok} bg={c.okBg} />
+                      <Badge label={`${doneCount}/${forms.length}`} color={c.okText} bg={c.okBg} />
                     )}
                     <Ionicons
                       name={open ? 'chevron-down' : 'chevron-back'}
@@ -243,7 +243,7 @@ export default function RosterScreen() {
                                   </Text>
                                 </View>
                               ) : (
-                                <Badge label="لم يُقيَّم" color={c.warn} bg={c.warnBg} />
+                                <Badge label="لم يُقيَّم" color={c.warnText} bg={c.warnBg} />
                               )}
                               <Ionicons name="chevron-back" size={16} color={c.text4} />
                             </Pressable>

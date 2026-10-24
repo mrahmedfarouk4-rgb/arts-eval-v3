@@ -118,7 +118,7 @@ export default function RecordsScreen() {
           <Stat
             value={scored.length}
             label="مُقيَّم"
-            color={c.ok}
+            color={c.okText}
             underline={filterStatus === 'done'}
           />
         </Pressable>
@@ -132,7 +132,7 @@ export default function RecordsScreen() {
           <Stat
             value={pending}
             label="جاهز للتعبئة"
-            color={c.warn}
+            color={c.warnText}
             underline={filterStatus === 'ready'}
           />
         </Pressable>
@@ -157,21 +157,21 @@ export default function RecordsScreen() {
           </Pressable>
           <Pressable
             onPress={() => setFilterStatus('done')}
-            style={[s.chip, filterStatus === 'done' && { backgroundColor: c.ok, borderColor: c.ok }]}
+            style={[s.chip, filterStatus === 'done' && { backgroundColor: c.okBg, borderColor: c.ok }]}
             accessibilityRole="radio"
             accessibilityState={{ selected: filterStatus === 'done' }}
           >
-            <Text style={[s.chipText, filterStatus === 'done' && s.chipTextOn]}>
+            <Text style={[s.chipText, filterStatus === 'done' && { color: c.okText, fontFamily: fnt.b }]}>
               مُقيَّم ({scored.length})
             </Text>
           </Pressable>
           <Pressable
             onPress={() => setFilterStatus('ready')}
-            style={[s.chip, filterStatus === 'ready' && { backgroundColor: c.warn, borderColor: c.warn }]}
+            style={[s.chip, filterStatus === 'ready' && { backgroundColor: c.warnBg, borderColor: c.warn }]}
             accessibilityRole="radio"
             accessibilityState={{ selected: filterStatus === 'ready' }}
           >
-            <Text style={[s.chipText, filterStatus === 'ready' && s.chipTextOn]}>
+            <Text style={[s.chipText, filterStatus === 'ready' && { color: c.warnText, fontFamily: fnt.b }]}>
               جاهز ({pending})
             </Text>
           </Pressable>
@@ -319,7 +319,7 @@ export default function RecordsScreen() {
                         <Badge label={item.label} color={c.text3} bg={c.bgLift} />
                       )}
                       {!scored ? (
-                        <Badge label="لم يُقيَّم" color={c.warn} bg={c.warnBg} />
+                        <Badge label="لم يُقيَّم" color={c.warnText} bg={c.warnBg} />
                       ) : lv ? (
                         <Badge
                           label={ratioLevelName(item.evaluation_type, sum, t.actualMax)}
@@ -336,7 +336,7 @@ export default function RecordsScreen() {
                       <Text style={s.scoreMax}>/{t.actualMax}</Text>
                     </View>
                   ) : (
-                    <Ionicons name="create-outline" size={19} color={c.warn} />
+                    <Ionicons name="create-outline" size={19} color={c.warnText} />
                   )}
                   <Ionicons name="chevron-back" size={16} color={c.text4} />
                 </Pressable>

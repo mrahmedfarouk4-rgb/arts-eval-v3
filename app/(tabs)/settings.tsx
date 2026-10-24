@@ -86,7 +86,7 @@ export default function SettingsScreen() {
   const onClear = async () => {
     const ok = await confirmAction(
       'حذف كل البيانات',
-      'سيتم حذف جميع الطلاب والتقييمات نهائياً من هذا الجهاز. هل أنت متأكد؟',
+      'سيتم حذف جميع الطلاب والتقييمات وتقارير الستة أسابيع نهائياً من هذا الجهاز. هل أنت متأكد؟',
       { confirmLabel: 'حذف كل شيء', destructive: true }
     );
     if (!ok) return;
@@ -106,10 +106,10 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* تحذير كلمة سر المشرف الافتراضية */}
         {adminPwIsDefault && (
-          <Card padding={sp.md} style={{ borderColor: 'rgba(178,58,58,0.28)', backgroundColor: c.errBg }}>
+          <Card padding={sp.md} style={{ borderColor: c.errLine, backgroundColor: c.errBg }}>
             <View style={s.row}>
-              <Ionicons name="warning-outline" size={18} color={c.err} />
-              <Text style={[s.cardHint, { color: c.err, flex: 1 }]}>
+              <Ionicons name="warning-outline" size={18} color={c.errText} />
+              <Text style={[s.cardHint, { color: c.errText, flex: 1 }]}>
                 كلمة سر المشرف ما زالت «admin» المعروفة. غيّرها من «إعداد المعلمين»
                 حتى لا يفتح أحد هذه الشاشة.
               </Text>
@@ -189,14 +189,14 @@ export default function SettingsScreen() {
               accessibilityRole="switch"
               accessibilityState={{ checked: editMode }}
             >
-              <View style={[s.toggleIcon, editMode && { backgroundColor: c.okBg, borderColor: 'rgba(15,122,79,0.28)' }]}>
+              <View style={[s.toggleIcon, editMode && { backgroundColor: c.okBg, borderColor: c.okLine }]}>
                 <Ionicons
                   name={editMode ? 'lock-open' : authenticated ? 'lock-closed' : 'person-circle-outline'}
                   size={18}
-                  color={editMode ? c.ok : authenticated ? c.text3 : c.warn}
+                  color={editMode ? c.okText : authenticated ? c.text3 : c.warnText}
                 />
               </View>
-              <Text style={[s.toggleLabel, editMode && { color: c.ok }]}>
+              <Text style={[s.toggleLabel, editMode && { color: c.okText }]}>
                 {editMode
                   ? 'وضع التعديل مُفعّل'
                   : authenticated
@@ -221,7 +221,7 @@ export default function SettingsScreen() {
               icon={authenticated ? 'shield-checkmark-outline' : 'eye-outline'}
               label="الصلاحية"
               value={authenticated ? (user?.role === 'admin' ? 'مشرف — كل المقررات' : 'معلم — مقرراته المسندة') : 'بدون تسجيل دخول'}
-              color={authenticated ? c.ok : c.text3}
+              color={authenticated ? c.okText : c.text3}
             />
             <Line
               icon="albums-outline"
@@ -274,7 +274,7 @@ export default function SettingsScreen() {
               </View>
               <Badge
                 label={settings?.sync_enabled ? 'مفعّلة' : 'معطّلة'}
-                color={settings?.sync_enabled ? c.ok : c.text3}
+                color={settings?.sync_enabled ? c.okText : c.text3}
                 bg={settings?.sync_enabled ? c.okBg : c.bgLift}
               />
             </View>
@@ -429,8 +429,8 @@ export default function SettingsScreen() {
         {/* منطقة خطرة */}
         {editMode && (
           <Section title="منطقة الخطر">
-            <Card padding={sp.lg} style={{ borderColor: 'rgba(178,58,58,0.25)', backgroundColor: c.errBg }}>
-              <Text style={[s.cardHint, { color: c.err }]}>
+            <Card padding={sp.lg} style={{ borderColor: c.errLine, backgroundColor: c.errBg }}>
+              <Text style={[s.cardHint, { color: c.errText }]}>
                 حذف جميع الطلاب والتقييمات من هذا الجهاز نهائياً.
               </Text>
               <Button
@@ -469,7 +469,7 @@ function StatBox({
   label: string;
   tone?: 'warn';
 }) {
-  const color = tone === 'warn' && value > 0 ? c.warn : c.primary;
+  const color = tone === 'warn' && value > 0 ? c.warnText : c.primary;
   return (
     <View style={s.statBox}>
       <Text style={[s.statValue, { color }]}>{value}</Text>

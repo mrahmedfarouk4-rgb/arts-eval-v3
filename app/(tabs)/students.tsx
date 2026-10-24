@@ -221,7 +221,7 @@ export default function StudentsScreen() {
                         <Ionicons name="archive-outline" size={17} color={c.text3} />
                       </Pressable>
                       <Pressable onPress={() => onDelete(item)} hitSlop={8} style={s.iconBtn}>
-                        <Ionicons name="trash-outline" size={17} color={c.err} />
+                        <Ionicons name="trash-outline" size={17} color={c.errText} />
                       </Pressable>
                     </View>
                   ) : (
