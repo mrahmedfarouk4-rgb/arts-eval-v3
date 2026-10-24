@@ -14,6 +14,10 @@ import {
   unitCount, unitLabel, plannedLabel, plannedId, unitFromLabel,
   PERIODIC_LABEL, FINAL_LABEL,
 } from '@/constants/plans';
+import {
+  SIX_WEEK_STORAGE_KEY, SIX_WEEK_DRAFT_KEY,
+  listSixWeekReports, mergeSixWeekReports, type SixWeekReport,
+} from '@/lib/six-week';
 
 /* ------------------------------------------------------------------ */
 /*  الأنواع                                                             */
@@ -921,28 +925,32 @@ export async function pendingSyncCount(): Promise<number> {
 /* ------------------------------------------------------------------ */
 
 export async function exportAll(): Promise<string> {
-  const [students, evaluations, settings, drafts] = await Promise.all([
+  const [students, evaluations, settings, drafts, sixWeekReports] = await Promise.all([
     read<Student[]>(K.students, []),
     read<Evaluation[]>(K.evaluations, []),
     getSettings(),
     listDrafts(),
+    listSixWeekReports(),
   ]);
   return JSON.stringify(
     {
       app: 'arts-eval-v2',
-      version: 2,
+      version: 3,
       exported_at: new Date().toISOString(),
       students,
       evaluations,
       settings,
       drafts,
+      six_week_reports: sixWeekReports,
     },
     null,
     2
   );
 }
 
-export async function importAll(json: string): Promise<{ students: number; evaluations: number }> {
+export async function importAll(json: string): Promise<{
+  students: number; evaluations: number; reports: number;
+}> {
   const data = JSON.parse(json);
   if (data.app !== 'arts-eval-v2') throw new Error('الملف لا يخص هذا التطبيق');
 
@@ -962,7 +970,9 @@ export async function importAll(json: string): Promise<{ students: number; evalu
   if (data.settings) await write(K.settings, data.settings);
   if (data.drafts) await write(K.drafts, data.drafts);
 
-  return { students: students.length, evaluations: evaluations.length };
+  const reports = await mergeSixWeekReports((data.six_week_reports ?? []) as SixWeekReport[]);
+
+  return { students: students.length, evaluations: evaluations.length, reports };
 }
 
 export async function clearAll(): Promise<void> {
@@ -972,6 +982,8 @@ export async function clearAll(): Promise<void> {
     AsyncStorage.removeItem(K.drafts),
     AsyncStorage.removeItem(K.syncQueue),
     AsyncStorage.removeItem(K.seeded),
+    AsyncStorage.removeItem(SIX_WEEK_STORAGE_KEY),
+    AsyncStorage.removeItem(SIX_WEEK_DRAFT_KEY),
   ]);
   await write(K.settings, DEFAULT_SETTINGS);
 }

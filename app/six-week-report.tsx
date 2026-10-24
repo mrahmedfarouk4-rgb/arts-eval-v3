@@ -10,13 +10,16 @@ import { GRADES, gradeName, type GradeId } from '@/constants/criteria';
 import { c, sp, rad, fnt, fs } from '@/constants/brand';
 import { Button, Card, Badge, Banner, Section, TopBar } from '@/components/pro-ui';
 import { useSession } from '@/lib/session';
+import { confirmAction } from '@/lib/dialog';
 import { listStudents, type Student } from '@/lib/store';
 import { emitHtml } from '@/lib/print-client';
 import { buildSixWeekReportHtml } from '@/lib/six-week-print';
 import {
   REPORT_SUBJECTS, REPORT_RATINGS, REPORT_CRITERIA, emptyCriteria,
   getSixWeekReport, saveSixWeekReport,
+  loadSixWeekDraft, saveSixWeekDraft, clearSixWeekDraft, draftHasContent,
   type CriteriaMap, type ReportCriterionId, type ReportRating, type ReportSubjectId,
+  type SixWeekDraft,
 } from '@/lib/six-week';
 import {
   BEHAVIOR_TEMPLATES, COURSE_TEMPLATES, CRITERION_TEMPLATE_GROUPS,
@@ -24,45 +27,6 @@ import {
   SUMMARY_TEMPLATES, TEMPLATE_LEVELS,
   type SixWeekTemplate,
 } from '@/constants/six-week-templates';
-
-type TemplateTarget =
-  | { kind: 'summary' }
-  | { kind: 'behavior' }
-  | { kind: 'social' }
-  | { kind: 'recommendations' }
-  | { kind: 'course'; subjectId: ReportSubjectId }
-  | { kind: 'criterion'; criterionId: ReportCriterionId };
-
-/** يجمع قوالب البند المطلوب، مع إتاحة قوالب ذوي الهمم لكل مقرر */
-function templatesFor(target: TemplateTarget): { title: string; templates: SixWeekTemplate[] } {
-  switch (target.kind) {
-    case 'summary':
-      return { title: 'قوالب الأداء العام', templates: SUMMARY_TEMPLATES };
-    case 'behavior':
-      return { title: 'قوالب السلوك والانضباط', templates: [...BEHAVIOR_TEMPLATES, ...SPECIAL_TEMPLATES] };
-    case 'social':
-      return {
-        title: 'قوالب الجوانب الشخصية والاجتماعية',
-        templates: [...SOCIAL_TEMPLATES, ...SPECIAL_TEMPLATES],
-      };
-    case 'recommendations':
-      return { title: 'قوالب التوصيات', templates: [...RECOMMENDATION_TEMPLATES, ...SPECIAL_TEMPLATES] };
-    case 'course': {
-      const subject = REPORT_SUBJECTS.find((s) => s.id === target.subjectId);
-      return {
-        title: `قوالب ${subject?.name ?? 'المقرر'}`,
-        templates: [...COURSE_TEMPLATES[target.subjectId], ...SPECIAL_TEMPLATES],
-      };
-    }
-    case 'criterion': {
-      const criterion = REPORT_CRITERIA.find((cr) => cr.id === target.criterionId);
-      return {
-        title: `قوالب ${criterion?.name ?? 'المعيار'}`,
-        templates: CRITERION_TEMPLATE_GROUPS[target.criterionId],
-      };
-    }
-  }
-}
 
 type CourseDraft = { enabled: boolean; rating: ReportRating; note: string };
 type CourseMap = Record<ReportSubjectId, CourseDraft>;
@@ -72,6 +36,18 @@ function todayISO(): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
+
+/** وقت محلي بصيغة 24h — لعرض «مسودة حُفظت 14:32» */
+function clockTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** إلحاق نموذج بما كتبه المعلم — لا يستبدل نصاً قائماً ولا يكرّر النموذج */
+const appendText = (cur: string, text: string) =>
+  cur.trim() ? `${cur.trim()}\n${text}` : text;
 
 function emptyCourses(): CourseMap {
   return Object.fromEntries(
@@ -105,38 +81,99 @@ function RatingPicker({
   );
 }
 
-function TemplatesChip({ label, onPress }: { label: string; onPress: () => void }) {
+function TemplatePanel({
+  title, templates, level = 'excellent', value, onInsert,
+}: {
+  title: string;
+  templates: SixWeekTemplate[];
+  level?: ReportRating;
+  value: string;
+  onInsert: (text: string) => void;
+}) {
+  const levels = TEMPLATE_LEVELS.filter((lv) => templates.some((t) => t.level === lv.id));
+  const initial = levels.some((lv) => lv.id === level) ? level : (levels[0]?.id ?? 'excellent');
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<ReportRating>(initial);
+  const active = levels.some((lv) => lv.id === picked) ? picked : (levels[0]?.id ?? 'excellent');
+  const options = templates.filter((t) => t.level === active);
+
+  if (!templates.length) return null;
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [s.templatesChip, pressed && { opacity: 0.65 }]}
-      accessibilityRole="button"
-      accessibilityLabel={`قوالب ${label}`}
-    >
-      <Ionicons name="sparkles-outline" size={12} color={c.primary} />
-      <Text style={s.templatesChipText}>قوالب جاهزة</Text>
-    </Pressable>
+    <View style={s.tpl}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        style={({ pressed }) => [s.tplToggle, pressed && { opacity: 0.85 }]}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+      >
+        <Ionicons name={open ? 'chevron-up' : 'sparkles-outline'} size={13} color={c.primary} />
+        <Text style={s.tplToggleText}>{open ? 'إخفاء القوالب' : 'قوالب جاهزة'}</Text>
+      </Pressable>
+
+      {open && (
+        <View style={s.tplBody}>
+          <Text style={s.tplLabel}>{title}</Text>
+          <View style={s.tplLevels}>
+            {levels.map((lv) => {
+              const on = lv.id === active;
+              return (
+                <Pressable
+                  key={lv.id}
+                  onPress={() => setPicked(lv.id)}
+                  style={[s.tplLevel, on && s.tplLevelOn]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                >
+                  <Text style={[s.tplLevelText, on && s.tplLevelTextOn]}>{lv.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {options.map((t) => {
+            const used = value.includes(t.text);
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => onInsert(t.text)}
+                style={({ pressed }) => [s.tplOption, used && s.tplOptionOn, pressed && { opacity: 0.9 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`إضافة ${t.title}`}
+              >
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={s.tplTag}>{t.title}</Text>
+                  <Text style={s.tplText}>{t.text}</Text>
+                </View>
+                <Ionicons
+                  name={used ? 'checkmark-circle' : 'add-circle-outline'}
+                  size={19}
+                  color={used ? c.primary : c.text4}
+                />
+              </Pressable>
+            );
+          })}
+          {options.length === 0 ? (
+            <Text style={s.tplEmpty}>لا توجد قوالب في هذا المستوى.</Text>
+          ) : null}
+        </View>
+      )}
+    </View>
   );
 }
 
 function Field({
-  label, value, onChange, placeholder, minHeight = 76, onTemplates, templatesLabel,
+  label, value, onChange, placeholder, minHeight = 76,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   minHeight?: number;
-  onTemplates?: () => void;
-  templatesLabel?: string;
 }) {
   return (
     <View style={{ gap: sp.xs }}>
       <View style={s.fieldHead}>
         <Text style={[s.fieldLabel, { marginBottom: 0, flex: 1 }]}>{label}</Text>
-        {onTemplates ? (
-          <TemplatesChip label={templatesLabel ?? label} onPress={onTemplates} />
-        ) : null}
       </View>
       <TextInput
         value={value}
@@ -188,8 +225,11 @@ export default function SixWeekReportScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
-  const [templateTarget, setTemplateTarget] = useState<TemplateTarget | null>(null);
-  const [templateLevel, setTemplateLevel] = useState<ReportRating>('excellent');
+
+  /** تغييرات المستخدم لم تُحفظ كتقرير بعد — تشغّل الحفظ التلقائي وتنبيه الخروج */
+  const [dirty, setDirty] = useState(false);
+  const [draftAt, setDraftAt] = useState<string | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<SixWeekDraft | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -242,6 +282,52 @@ export default function SixWeekReportScreen() {
     return () => { alive = false; };
   }, [paramId]);
 
+  // مسودة سابقة لنفس السياق (تقرير جديد أو نفس المعرّف) — تُعرض للاسترجاع
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const d = await loadSixWeekDraft();
+      if (!alive || !d) return;
+      if (d.reportId !== (paramId ?? null)) return;
+      // مسودة طالب لا تُعرض عند فتح استمارة جديدة لطالب آخر
+      if (!paramId && paramStudentId && (d.student_id ?? null) !== paramStudentId) return;
+      if (!draftHasContent(d)) { await clearSixWeekDraft(); return; }
+      setPendingDraft(d);
+    })();
+    return () => { alive = false; };
+  }, [paramId, paramStudentId]);
+
+  const draftPayload = useMemo<Omit<SixWeekDraft, 'updated_at'>>(() => ({
+    reportId,
+    student_id: studentId,
+    student_name: studentName,
+    grade_id: gradeId,
+    report_date: date,
+    teacher_name: teacher,
+    summary,
+    behavior,
+    social,
+    recommendations,
+    criteria,
+    courses: REPORT_SUBJECTS.map((sb) => ({
+      subject_id: sb.id,
+      enabled: courses[sb.id].enabled,
+      rating: courses[sb.id].rating,
+      note: courses[sb.id].note,
+    })),
+  }), [reportId, studentId, studentName, gradeId, date, teacher,
+      summary, behavior, social, recommendations, criteria, courses]);
+
+  useEffect(() => {
+    if (!loaded || !dirty) return;
+    const t = setTimeout(() => {
+      saveSixWeekDraft(draftPayload).then(setDraftAt).catch((e) => {
+        console.error('[six-week] فشل حفظ المسودة التلقائي:', e);
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [draftPayload, loaded, dirty]);
+
   const filteredStudents = useMemo(
     () => (query.trim()
       ? students.filter((s) => s.name.includes(query.trim()))
@@ -251,7 +337,16 @@ export default function SixWeekReportScreen() {
 
   const selectedCount = REPORT_SUBJECTS.filter((s) => courses[s.id].enabled).length;
 
-  const goBack = () => {
+  const goBack = async () => {
+    if (dirty) {
+      const ok = await confirmAction(
+        'تغييرات غير محفوظة',
+        'لم تُحفظ التغييرات كتقرير، لكن احتفظنا بها كمسودة على هذا الجهاز —'
+        + ' ستُعرض عليك عند فتح التقرير مرة أخرى.',
+        { confirmLabel: 'خروج', cancelLabel: 'البقاء للمتابعة' }
+      );
+      if (!ok) return;
+    }
     if (router.canGoBack()) router.back();
     else router.replace('/six-weeks' as never);
   };
@@ -262,71 +357,51 @@ export default function SixWeekReportScreen() {
     setGradeId(st.grade_id);
     setPickerOpen(false);
     setQuery('');
+    setDirty(true);
+  };
+
+  const restoreDraft = (d: SixWeekDraft) => {
+    setReportId(d.reportId);
+    setStudentId(d.student_id);
+    setStudentName(d.student_name);
+    setGradeId(d.grade_id);
+    setDate(d.report_date);
+    setTeacher(d.teacher_name);
+    setSummary(d.summary);
+    setBehavior(d.behavior);
+    setSocial(d.social);
+    setRecommendations(d.recommendations);
+    setCriteria(d.criteria);
+    const map = emptyCourses();
+    for (const cr of d.courses) {
+      if (map[cr.subject_id]) {
+        map[cr.subject_id] = { enabled: cr.enabled, rating: cr.rating, note: cr.note };
+      }
+    }
+    setCourses(map);
+    setPendingDraft(null);
+    setDirty(true);
+  };
+
+  const discardDraft = async () => {
+    await clearSixWeekDraft();
+    setPendingDraft(null);
+    setDraftAt(null);
   };
 
   const toggleCourse = (id: ReportSubjectId) => {
     setCourses((m) => ({ ...m, [id]: { ...m[id], enabled: !m[id].enabled } }));
+    setDirty(true);
   };
 
   const updateCourse = (id: ReportSubjectId, patch: Partial<CourseDraft>) => {
     setCourses((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
+    setDirty(true);
   };
 
   const updateCriterion = (id: ReportCriterionId, patch: Partial<CriteriaMap[ReportCriterionId]>) => {
     setCriteria((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
-  };
-
-  const templateInfo = useMemo(
-    () => (templateTarget ? templatesFor(templateTarget) : null),
-    [templateTarget]
-  );
-
-  const availableLevels = useMemo(() => {
-    const list = templateInfo?.templates ?? [];
-    return TEMPLATE_LEVELS.filter((lv) => list.some((t) => t.level === lv.id));
-  }, [templateInfo]);
-
-  const visibleTemplates = useMemo(
-    () => (templateInfo?.templates ?? []).filter((t) => t.level === templateLevel),
-    [templateInfo, templateLevel]
-  );
-
-  const openTemplates = (target: TemplateTarget, level: ReportRating = 'excellent') => {
-    const list = templatesFor(target).templates;
-    setTemplateTarget(target);
-    setTemplateLevel(list.some((t) => t.level === level) ? level : (list[0]?.level ?? 'excellent'));
-  };
-
-  const applyTemplate = (text: string, mode: 'append' | 'replace') => {
-    if (!templateTarget) return;
-    const merge = (current: string) =>
-      mode === 'replace' || !current.trim() ? text : `${current.trim()}\n${text}`;
-
-    switch (templateTarget.kind) {
-      case 'summary':
-        setSummary((v) => merge(v));
-        break;
-      case 'behavior':
-        setBehavior((v) => merge(v));
-        break;
-      case 'social':
-        setSocial((v) => merge(v));
-        break;
-      case 'recommendations':
-        setRecommendations((v) => merge(v));
-        break;
-      case 'course': {
-        const id = templateTarget.subjectId;
-        setCourses((m) => ({ ...m, [id]: { ...m[id], note: merge(m[id].note) } }));
-        break;
-      }
-      case 'criterion': {
-        const id = templateTarget.criterionId;
-        setCriteria((m) => ({ ...m, [id]: { ...m[id], note: merge(m[id].note) } }));
-        break;
-      }
-    }
-    setTemplateTarget(null);
+    setDirty(true);
   };
 
   const onSave = async (printAfter: boolean) => {
@@ -365,6 +440,10 @@ export default function SixWeekReportScreen() {
         recommendations: recommendations.trim(),
       });
       setReportId(saved.id);
+      await clearSixWeekDraft();
+      setPendingDraft(null);
+      setDraftAt(null);
+      setDirty(false);
       if (printAfter) {
         await emitHtml(buildSixWeekReportHtml(saved));
       } else {
@@ -398,10 +477,31 @@ export default function SixWeekReportScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {pendingDraft && (
+              <Card padding={sp.md} accent={c.gold}>
+                <View style={s.draftRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.draftTitle}>مسودة غير محفوظة</Text>
+                    <Text style={s.draftSub}>
+                      {pendingDraft.student_name ? `تقرير ${pendingDraft.student_name} — ` : ''}
+                      {`حُفظت تلقائياً ${clockTime(pendingDraft.updated_at)}`}
+                    </Text>
+                  </View>
+                  <Button
+                    label="استرجاع"
+                    icon="time-outline"
+                    size="sm"
+                    onPress={() => restoreDraft(pendingDraft)}
+                  />
+                  <Button label="تجاهل" size="sm" variant="soft" onPress={discardDraft} />
+                </View>
+              </Card>
+            )}
+
             <Banner
               level="info"
               title="قوالب تقييم جاهزة"
-              message="عند كل بند زر «قوالب جاهزة»: اختر مستوى التقدير، ثم أضف النص أو استبدله. يمكنك تعديل النص بعد إدراجه."
+              message="أسفل كل بند زر «قوالب جاهزة»: اختر مستوى التقدير، ثم أضف النص. يمكنك تعديل النص بعد إدراجه."
             />
 
             <Card padding={sp.md}>
@@ -434,7 +534,7 @@ export default function SixWeekReportScreen() {
                     <Text style={s.fieldLabel}>التاريخ</Text>
                     <TextInput
                       value={date}
-                      onChangeText={setDate}
+                      onChangeText={(v) => { setDate(v); setDirty(true); }}
                       placeholder="YYYY-MM-DD"
                       placeholderTextColor={c.text4}
                       style={s.input}
@@ -444,7 +544,7 @@ export default function SixWeekReportScreen() {
                     <Text style={s.fieldLabel}>إعداد معلم المادة</Text>
                     <TextInput
                       value={teacher}
-                      onChangeText={setTeacher}
+                      onChangeText={(v) => { setTeacher(v); setDirty(true); }}
                       placeholder="اسم المعلم"
                       placeholderTextColor={c.text4}
                       style={s.input}
@@ -458,10 +558,15 @@ export default function SixWeekReportScreen() {
               <Field
                 label="الأداء العام"
                 value={summary}
-                onChange={setSummary}
+                onChange={(v) => { setSummary(v); setDirty(true); }}
                 placeholder="اكتب فقرة أو أكثر عن أداء الطالب وتطوره، وافصل بين الفقرات بسطر جديد..."
                 minHeight={100}
-                onTemplates={() => openTemplates({ kind: 'summary' })}
+              />
+              <TemplatePanel
+                title="قوالب الأداء العام"
+                templates={SUMMARY_TEMPLATES}
+                value={summary}
+                onInsert={(t) => { setSummary((v) => appendText(v, t)); setDirty(true); }}
               />
             </Section>
 
@@ -498,13 +603,7 @@ export default function SixWeekReportScreen() {
                             value={cr.rating}
                             onChange={(v) => updateCourse(sub.id, { rating: v })}
                           />
-                          <View style={s.fieldHead}>
-                            <Text style={[s.fieldLabel, { marginBottom: 0, flex: 1 }]}>الملاحظات</Text>
-                            <TemplatesChip
-                              label={sub.name}
-                              onPress={() => openTemplates({ kind: 'course', subjectId: sub.id }, cr.rating)}
-                            />
-                          </View>
+                          <Text style={s.fieldLabel}>الملاحظات</Text>
                           <TextInput
                             value={cr.note}
                             onChangeText={(v) => updateCourse(sub.id, { note: v })}
@@ -513,6 +612,13 @@ export default function SixWeekReportScreen() {
                             multiline
                             textAlignVertical="top"
                             style={[s.textArea, { minHeight: 64 }]}
+                          />
+                          <TemplatePanel
+                            title={`قوالب ${sub.name}`}
+                            templates={[...COURSE_TEMPLATES[sub.id], ...SPECIAL_TEMPLATES]}
+                            level={cr.rating}
+                            value={cr.note}
+                            onInsert={(t) => updateCourse(sub.id, { note: appendText(cr.note, t) })}
                           />
                         </View>
                       )}
@@ -526,10 +632,14 @@ export default function SixWeekReportScreen() {
               <Field
                 label="الملاحظات"
                 value={behavior}
-                onChange={setBehavior}
+                onChange={(v) => { setBehavior(v); setDirty(true); }}
                 placeholder="الالتزام بالتعليمات، التعاون، المحافظة على أدوات المرسم..."
-                onTemplates={() => openTemplates({ kind: 'behavior' })}
-                templatesLabel="السلوك والانضباط"
+              />
+              <TemplatePanel
+                title="قوالب السلوك والانضباط"
+                templates={[...BEHAVIOR_TEMPLATES, ...SPECIAL_TEMPLATES]}
+                value={behavior}
+                onInsert={(t) => { setBehavior((v) => appendText(v, t)); setDirty(true); }}
               />
             </Section>
 
@@ -537,10 +647,14 @@ export default function SixWeekReportScreen() {
               <Field
                 label="الملاحظات"
                 value={social}
-                onChange={setSocial}
+                onChange={(v) => { setSocial(v); setDirty(true); }}
                 placeholder="الثقة بالنفس، العمل الجماعي، التعبير عن الأفكار..."
-                onTemplates={() => openTemplates({ kind: 'social' })}
-                templatesLabel="الجوانب الاجتماعية"
+              />
+              <TemplatePanel
+                title="قوالب الجوانب الشخصية والاجتماعية"
+                templates={[...SOCIAL_TEMPLATES, ...SPECIAL_TEMPLATES]}
+                value={social}
+                onInsert={(t) => { setSocial((v) => appendText(v, t)); setDirty(true); }}
               />
             </Section>
 
@@ -551,18 +665,7 @@ export default function SixWeekReportScreen() {
               <View style={{ gap: sp.md }}>
                 {REPORT_CRITERIA.map((cr) => (
                   <View key={cr.id} style={s.criterion}>
-                    <View style={s.criterionHead}>
-                      <Text style={[s.criterionTitle, { flex: 1 }]}>{cr.name}</Text>
-                      <TemplatesChip
-                        label={cr.name}
-                        onPress={() =>
-                          openTemplates(
-                            { kind: 'criterion', criterionId: cr.id },
-                            criteria[cr.id].rating
-                          )
-                        }
-                      />
-                    </View>
+                    <Text style={s.criterionTitle}>{cr.name}</Text>
                     <RatingPicker
                       value={criteria[cr.id].rating}
                       onChange={(v) => updateCriterion(cr.id, { rating: v })}
@@ -576,6 +679,15 @@ export default function SixWeekReportScreen() {
                       textAlignVertical="top"
                       style={[s.textArea, { minHeight: 56 }]}
                     />
+                    <TemplatePanel
+                      title={`قوالب ${cr.name}`}
+                      templates={CRITERION_TEMPLATE_GROUPS[cr.id]}
+                      level={criteria[cr.id].rating}
+                      value={criteria[cr.id].note}
+                      onInsert={(t) =>
+                        updateCriterion(cr.id, { note: appendText(criteria[cr.id].note, t) })
+                      }
+                    />
                   </View>
                 ))}
               </View>
@@ -585,30 +697,44 @@ export default function SixWeekReportScreen() {
               <Field
                 label="التوصيات"
                 value={recommendations}
-                onChange={setRecommendations}
+                onChange={(v) => { setRecommendations(v); setDirty(true); }}
                 placeholder="التوصيات المقترحة لدعم الطالب وتطوير أدائه..."
                 minHeight={100}
-                onTemplates={() => openTemplates({ kind: 'recommendations' })}
+              />
+              <TemplatePanel
+                title="قوالب التوصيات"
+                templates={[...RECOMMENDATION_TEMPLATES, ...SPECIAL_TEMPLATES]}
+                value={recommendations}
+                onInsert={(t) => { setRecommendations((v) => appendText(v, t)); setDirty(true); }}
               />
             </Section>
           </ScrollView>
 
           <View style={s.footer}>
-            <Button
-              label="حفظ"
-              icon="save-outline"
-              variant="soft"
-              loading={saving}
-              onPress={() => onSave(false)}
-              style={{ flex: 1 }}
-            />
-            <Button
-              label="حفظ وطباعة"
-              icon="print-outline"
-              loading={saving}
-              onPress={() => onSave(true)}
-              style={{ flex: 1.4 }}
-            />
+            {dirty && (
+              <Text style={s.draftHint}>
+                {draftAt
+                  ? `مسودة محفوظة تلقائياً ${clockTime(draftAt)} — لم يُحفظ التقرير بعد`
+                  : 'تغييرات لم تُحفظ'}
+              </Text>
+            )}
+            <View style={s.footerRow}>
+              <Button
+                label="حفظ"
+                icon="save-outline"
+                variant="soft"
+                loading={saving}
+                onPress={() => onSave(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="حفظ وطباعة"
+                icon="print-outline"
+                loading={saving}
+                onPress={() => onSave(true)}
+                style={{ flex: 1.4 }}
+              />
+            </View>
           </View>
         </KeyboardAvoidingView>
       )}
@@ -663,92 +789,6 @@ export default function SixWeekReportScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* مكتبة القوالب الجاهزة — تُفتح من زر «قوالب جاهزة» عند أي بند */}
-      <Modal
-        visible={!!templateTarget}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setTemplateTarget(null)}
-      >
-        <View style={s.modalScrim}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setTemplateTarget(null)} />
-          <View style={s.templateSheet}>
-            <View style={s.modalHead}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.modalTitle}>{templateInfo?.title ?? 'قوالب جاهزة'}</Text>
-                <Text style={s.modalSub}>
-                  اختر المستوى، ثم أضف النص إلى الحقل أو استبدل ما فيه
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => setTemplateTarget(null)}
-                hitSlop={10}
-                accessibilityLabel="إغلاق"
-              >
-                <Ionicons name="close" size={20} color={c.text2} />
-              </Pressable>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.levelRow}
-            >
-              {availableLevels.map((lv) => {
-                const on = lv.id === templateLevel;
-                return (
-                  <Pressable
-                    key={lv.id}
-                    onPress={() => setTemplateLevel(lv.id)}
-                    style={[s.levelChip, on && s.levelChipOn]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                  >
-                    <Text style={[s.levelChipText, on && s.levelChipTextOn]}>{lv.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <ScrollView style={{ maxHeight: 430 }} showsVerticalScrollIndicator={false}>
-              {visibleTemplates.map((tpl) => (
-                <View key={tpl.id} style={s.templateCard}>
-                  <Text style={s.templateTitle}>{tpl.title}</Text>
-                  <Text style={s.templateText}>{tpl.text}</Text>
-                  <View style={s.templateActions}>
-                    <Pressable
-                      onPress={() => applyTemplate(tpl.text, 'append')}
-                      style={({ pressed }) => [
-                        s.templateBtn,
-                        s.templateBtnPrimary,
-                        pressed && { opacity: 0.75 },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`إضافة ${tpl.title}`}
-                    >
-                      <Ionicons name="add-circle-outline" size={15} color={c.onPrimary} />
-                      <Text style={[s.templateBtnText, { color: c.onPrimary }]}>إضافة</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => applyTemplate(tpl.text, 'replace')}
-                      style={({ pressed }) => [s.templateBtn, pressed && { opacity: 0.75 }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`استبدال بـ ${tpl.title}`}
-                    >
-                      <Ionicons name="swap-horizontal-outline" size={15} color={c.primary} />
-                      <Text style={[s.templateBtnText, { color: c.primary }]}>استبدال</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-              {visibleTemplates.length === 0 ? (
-                <Text style={s.modalEmpty}>لا توجد قوالب في هذا المستوى.</Text>
-              ) : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -774,13 +814,6 @@ const s = StyleSheet.create({
 
   metaRow: { flexDirection: 'row', gap: sp.sm },
   fieldHead: { flexDirection: 'row', alignItems: 'center', gap: sp.xs, marginBottom: 4 },
-  templatesChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4,
-    borderRadius: rad.pill, borderWidth: 1, borderColor: c.primaryLine,
-    backgroundColor: c.primaryBg,
-  },
-  templatesChipText: { fontFamily: fnt.m, fontSize: 10, color: c.primary },
   fieldLabel: { fontFamily: fnt.m, fontSize: fs.xs, color: c.text3, marginBottom: 4 },
   input: {
     minHeight: 42, borderWidth: 1, borderColor: c.line, borderRadius: rad.sm,
@@ -811,13 +844,51 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: c.line, borderRadius: rad.md,
     padding: sp.md, gap: sp.sm, backgroundColor: c.bgAlt,
   },
-  criterionHead: { flexDirection: 'row', alignItems: 'center', gap: sp.xs },
   criterionTitle: { fontFamily: fnt.sb, fontSize: fs.sm, color: c.text },
 
+  /* لوحة قوالب الصياغة — حدودها بارزة عن بطاقات الحقول وشرائحها مخطّطة
+     لا معبّأة، حتى لا تُخلط بشرائح التقدير في الاستمارة */
+  tpl: { gap: sp.xs },
+  tplToggle: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 5,
+    paddingHorizontal: sp.sm, paddingVertical: 6,
+    borderRadius: rad.pill, borderWidth: 1, borderColor: c.primaryLine,
+    backgroundColor: c.primaryBg,
+  },
+  tplToggleText: { fontFamily: fnt.m, fontSize: fs.xxs, color: c.primary },
+  tplBody: {
+    gap: sp.sm, padding: sp.sm, borderRadius: rad.md,
+    borderWidth: 1, borderColor: c.line, backgroundColor: c.bgLift,
+  },
+  tplLabel: { fontFamily: fnt.r, fontSize: fs.xxs, color: c.text3 },
+  tplLevels: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  tplLevel: {
+    paddingHorizontal: sp.sm, paddingVertical: 4, borderRadius: rad.pill,
+    borderWidth: 1, borderColor: c.lineHi, backgroundColor: c.white,
+  },
+  tplLevelOn: { borderColor: c.primary, backgroundColor: c.primaryBg },
+  tplLevelText: { fontFamily: fnt.m, fontSize: fs.xxs, color: c.text3 },
+  tplLevelTextOn: { fontFamily: fnt.sb, color: c.primary },
+  tplOption: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm,
+    padding: sp.sm, borderRadius: rad.sm, borderWidth: 1, borderColor: c.line,
+    backgroundColor: c.white,
+  },
+  tplOptionOn: { borderColor: c.primaryLine, backgroundColor: c.primaryBg },
+  tplTag: { fontFamily: fnt.sb, fontSize: fs.xxs, color: c.primary },
+  tplText: { fontFamily: fnt.r, fontSize: fs.xs, color: c.text2, lineHeight: 19 },
+  tplEmpty: { fontFamily: fnt.r, fontSize: fs.xs, color: c.text3, textAlign: 'center' },
+
   footer: {
-    flexDirection: 'row', gap: sp.sm, padding: sp.md,
+    padding: sp.md, gap: sp.xs,
     borderTopWidth: 1, borderTopColor: c.line, backgroundColor: c.bg,
   },
+  footerRow: { flexDirection: 'row', gap: sp.sm },
+  draftHint: { fontFamily: fnt.r, fontSize: fs.xxs, color: c.text3, textAlign: 'center' },
+
+  draftRow: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
+  draftTitle: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
+  draftSub: { fontFamily: fnt.r, fontSize: fs.xs, color: c.text3, marginTop: 2 },
 
   modalScrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
   modalSheet: {
@@ -826,37 +897,7 @@ const s = StyleSheet.create({
   },
   modalHead: { flexDirection: 'row', alignItems: 'center', marginBottom: sp.md },
   modalTitle: { flex: 1, fontFamily: fnt.b, fontSize: fs.md, color: c.text },
-  modalSub: { fontFamily: fnt.r, fontSize: fs.xxs, color: c.text3, marginTop: 2 },
   modalEmpty: { fontFamily: fnt.r, fontSize: fs.sm, color: c.text3, textAlign: 'center', padding: sp.lg },
-
-  templateSheet: {
-    backgroundColor: c.bg, borderTopLeftRadius: rad.xl, borderTopRightRadius: rad.xl,
-    padding: sp.lg, paddingBottom: sp.xl, maxHeight: '88%',
-  },
-  levelRow: { flexDirection: 'row', gap: sp.xs, paddingBottom: sp.sm },
-  levelChip: {
-    paddingHorizontal: sp.sm, paddingVertical: 6,
-    borderRadius: rad.pill, borderWidth: 1, borderColor: c.line,
-    backgroundColor: c.bgAlt,
-  },
-  levelChipOn: { backgroundColor: c.primary, borderColor: c.primary },
-  levelChipText: { fontFamily: fnt.m, fontSize: fs.xs, color: c.text2 },
-  levelChipTextOn: { color: c.onPrimary, fontFamily: fnt.sb },
-  templateCard: {
-    borderWidth: 1, borderColor: c.line, borderRadius: rad.md,
-    backgroundColor: c.bgAlt, padding: sp.md, marginBottom: sp.sm, gap: sp.xs,
-  },
-  templateTitle: { fontFamily: fnt.b, fontSize: fs.sm, color: c.primary },
-  templateText: { fontFamily: fnt.r, fontSize: fs.xs, color: c.text2, lineHeight: 20 },
-  templateActions: { flexDirection: 'row', gap: sp.xs, marginTop: sp.xxs },
-  templateBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingHorizontal: sp.sm, paddingVertical: 6,
-    borderRadius: rad.sm, borderWidth: 1, borderColor: c.primaryLine,
-    backgroundColor: c.bg,
-  },
-  templateBtnPrimary: { backgroundColor: c.primary, borderColor: c.primary },
-  templateBtnText: { fontFamily: fnt.sb, fontSize: fs.xxs },
   studentItem: {
     flexDirection: 'row', alignItems: 'center', gap: sp.sm,
     paddingVertical: sp.sm, paddingHorizontal: sp.xs,

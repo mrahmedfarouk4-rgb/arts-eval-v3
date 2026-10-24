@@ -10,6 +10,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GradeId, TermId } from '@/constants/criteria';
 
 const KEY = '@v2/six_week_reports';
+const DRAFT_KEY = '@v2/six_week_draft';
+
+/** مفتاحا التخزين — تحتاجهما طبقة النسخ الاحتياطي في lib/store.ts */
+export const SIX_WEEK_STORAGE_KEY = KEY;
+export const SIX_WEEK_DRAFT_KEY = DRAFT_KEY;
 
 export const REPORT_RATINGS = [
   { id: 'excellent', label: 'ممتاز' },
@@ -158,6 +163,98 @@ export async function saveSixWeekReport(input: SaveReportInput): Promise<SixWeek
 export async function deleteSixWeekReport(id: string): Promise<void> {
   const all = await readAll();
   await writeAll(all.filter((r) => r.id !== id));
+}
+
+/**
+ * يدمج تقارير قادمة من ملف نسخة احتياطية — الأحدث لكل معرّف يفوز،
+ * ولا يحذف شيئاً موجوداً. يُرجع عدد ما أُضيف أو حُدّث.
+ */
+export async function mergeSixWeekReports(incoming: SixWeekReport[]): Promise<number> {
+  if (!incoming.length) return 0;
+  const all = await readAll();
+  const map = new Map(all.map((r) => [r.id, r]));
+  let applied = 0;
+  for (const raw of incoming) {
+    const r = normalizeReport(raw);
+    const cur = map.get(r.id);
+    if (cur && cur.updated_at >= r.updated_at) continue;
+    map.set(r.id, r);
+    applied++;
+  }
+  if (applied) await writeAll([...map.values()]);
+  return applied;
+}
+
+/* ------------------------------------------------------------------ */
+/*  المسودة — محرر التقرير طويل، وفقدان ما كُتب أفقدٌ من حفظه           */
+/* ------------------------------------------------------------------ */
+
+export interface SixWeekDraftCourse {
+  subject_id: ReportSubjectId;
+  enabled: boolean;
+  rating: ReportRating;
+  note: string;
+}
+
+export interface SixWeekDraft {
+  /** معرّف التقرير المحفوظ قيد التعديل — null لتقرير لم يُحفظ بعد */
+  reportId: string | null;
+  student_id: string | null;
+  student_name: string;
+  grade_id: GradeId | null;
+  report_date: string;
+  teacher_name: string;
+  summary: string;
+  courses: SixWeekDraftCourse[];
+  behavior: string;
+  social: string;
+  criteria: CriteriaMap;
+  recommendations: string;
+  updated_at: string;
+}
+
+export async function loadSixWeekDraft(): Promise<SixWeekDraft | null> {
+  try {
+    const raw = await AsyncStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as SixWeekDraft;
+    if (!d || typeof d !== 'object' || !d.updated_at) return null;
+
+    // مسودة قديمة قد تنقصها معايير مضافة لاحقاً
+    const criteria = emptyCriteria();
+    for (const { id } of REPORT_CRITERIA) {
+      const v = d.criteria?.[id];
+      if (v) criteria[id] = { rating: v.rating ?? 'excellent', note: v.note ?? '' };
+    }
+    return { ...d, criteria, courses: Array.isArray(d.courses) ? d.courses : [] };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveSixWeekDraft(
+  draft: Omit<SixWeekDraft, 'updated_at'>
+): Promise<string> {
+  const at = new Date().toISOString();
+  await AsyncStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, updated_at: at }));
+  return at;
+}
+
+export async function clearSixWeekDraft(): Promise<void> {
+  await AsyncStorage.removeItem(DRAFT_KEY);
+}
+
+/** هل في المسودة ما يستحق عرضها للمعلم؟ — الافتتاحيات الفارغة تُتجاهل */
+export function draftHasContent(d: SixWeekDraft): boolean {
+  return !!(
+    d.student_id ||
+    d.summary.trim() ||
+    d.behavior.trim() ||
+    d.social.trim() ||
+    d.recommendations.trim() ||
+    d.courses.some((c) => c.enabled || c.note.trim()) ||
+    Object.values(d.criteria).some((v) => v.note.trim())
+  );
 }
 
 export function ratingLabel(id: ReportRating | string): string {
