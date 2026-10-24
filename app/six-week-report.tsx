@@ -6,7 +6,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { gradeName, type GradeId } from '@/constants/criteria';
+import { GRADES, gradeName, type GradeId } from '@/constants/criteria';
 import { c, sp, rad, fnt, fs } from '@/constants/brand';
 import { Button, Card, Badge, Banner, Section, TopBar } from '@/components/pro-ui';
 import { useSession } from '@/lib/session';
@@ -153,16 +153,27 @@ function Field({
 
 export default function SixWeekReportScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
-  const paramId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const params = useLocalSearchParams<{
+    id?: string;
+    studentId?: string;
+    studentName?: string;
+    gradeId?: string;
+  }>();
+  const first = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v);
+  const paramId = first(params.id);
+  const paramStudentId = first(params.studentId);
+  const paramStudentName = first(params.studentName);
+  const paramGradeId = first(params.gradeId);
   const { teacherName, term } = useSession();
 
   const [reportId, setReportId] = useState<string | null>(paramId ?? null);
   const [loaded, setLoaded] = useState(!paramId);
 
-  const [studentId, setStudentId] = useState<string | null>(null);
-  const [studentName, setStudentName] = useState('');
-  const [gradeId, setGradeId] = useState<GradeId | null>(null);
+  const [studentId, setStudentId] = useState<string | null>(paramStudentId ?? null);
+  const [studentName, setStudentName] = useState(paramStudentName ?? '');
+  const [gradeId, setGradeId] = useState<GradeId | null>(
+    GRADES.some((g) => g.id === paramGradeId) ? (paramGradeId as GradeId) : null
+  );
   const [date, setDate] = useState(todayISO());
   const [teacher, setTeacher] = useState(teacherName ?? '');
 
@@ -188,6 +199,17 @@ export default function SixWeekReportScreen() {
     })();
     return () => { alive = false; };
   }, []);
+
+  /** بدء تقرير من صف طالب: نستكمل الاسم والصف من سجل الطلاب إن لم يُمررا */
+  useEffect(() => {
+    if (paramId || !paramStudentId) return;
+    const found = students.find((st) => st.id === paramStudentId);
+    if (!found) return;
+    if (!paramStudentName) setStudentName(found.name);
+    if (!paramGradeId || !GRADES.some((g) => g.id === paramGradeId)) {
+      setGradeId(found.grade_id);
+    }
+  }, [students, paramId, paramStudentId, paramStudentName, paramGradeId]);
 
   useEffect(() => {
     if (!paramId) return;
