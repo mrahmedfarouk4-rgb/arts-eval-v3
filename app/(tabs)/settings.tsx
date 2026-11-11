@@ -37,6 +37,7 @@ export default function SettingsScreen() {
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [pending, setPending] = useState(0);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [teacherDraft, setTeacherDraft] = useState(teacherName ?? '');
   const [stats, setStats] = useState({ students: 0, evals: 0 });
@@ -61,26 +62,18 @@ export default function SettingsScreen() {
 
   const onSync = async () => {
     if (!ready) {
-      Alert.alert(
-        'المزامنة غير مهيّأة',
-        'التطبيق يعمل محلياً. لتفعيل المزامنة:\n' +
-          '1) أضف EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY إلى .env.local (محلي) أو Cloudflare (سحابي).\n' +
-          '2) أعد تشغيل التطبيق (أو hard refresh على الويب).\n' +
-          '3) ثم فعّل «المزامنة» وأعد المحاولة.'
-      );
+      setSyncStatus('المزامنة غير مهيّأة: أضف EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY.');
       return;
     }
     setBusy(true);
+    setSyncStatus(null);
     try {
       const r = await sync();
       if (r.ok) {
         const pullTotal = (r.pulled?.students ?? 0) + (r.pulled?.evaluations ?? 0);
-        Alert.alert(
-          'تمت المزامنة بنجاح',
-          `تم رفع ${r.pushed} تعديل إلى السحابة، وتحديث ${pullTotal} سجل من السيرفر.`
-        );
+        setSyncStatus(`✅ تمت المزامنة: رُفع ${r.pushed} تعديل، حُدّث ${pullTotal} سجل.`);
       } else {
-        Alert.alert('تعذرت المزامنة', r.error ?? 'تأكد من الاتصال بالإنترنت وإعدادات السيرفر.');
+        setSyncStatus(`❌ تعذرت المزامنة: ${r.error ?? 'تأكد من الاتصال بالإنترنت.'}`);
       }
       await refresh();
     } finally {
@@ -365,6 +358,11 @@ export default function SettingsScreen() {
               full
               style={{ marginTop: sp.md }}
             />
+            {!!syncStatus && (
+              <Text style={[s.note, { marginTop: sp.sm, color: syncStatus.startsWith('✅') ? c.okText : c.errText }]}>
+                {syncStatus}
+              </Text>
+            )}
             {!!settings?.last_sync && (
               <Text style={s.note}>
                 آخر مزامنة: {settings.last_sync.slice(0, 16).replace('T', ' ')}
