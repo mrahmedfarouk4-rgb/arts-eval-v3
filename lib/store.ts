@@ -18,6 +18,7 @@ import {
   SIX_WEEK_STORAGE_KEY, SIX_WEEK_DRAFT_KEY,
   listSixWeekReports, mergeSixWeekReports, type SixWeekReport,
 } from '@/lib/six-week';
+import { readSession } from '@/lib/accounts';
 
 /* ------------------------------------------------------------------ */
 /*  الأنواع                                                             */
@@ -547,6 +548,24 @@ export async function saveEvaluation(input: SaveEvalInput): Promise<Evaluation> 
   const now = new Date().toISOString();
   const settings = await getSettings();
 
+  /**
+   * اسم المعلم يُحفظ مع التقييم لا يُترك فارغاً.
+   * كان الاعتماد على `settings.teacher_name` وحده، وهو فارغ لمن سجّل
+   * دخوله بحساب معلم، فتُطبع الاستمارة لاحقاً بشرطة «—» مكان الاسم.
+   * الترتيب: ما مرّرته الشاشة، ثم الإعداد، ثم اسم الحساب المسجّل.
+   */
+  let sessionName: string | null = null;
+  try {
+    sessionName = (await readSession())?.name ?? null;
+  } catch {
+    /* التخزين غير متاح — نكمل بالإعداد */
+  }
+  const teacherName =
+    (input.teacher_name ?? '').trim() ||
+    (settings.teacher_name ?? '').trim() ||
+    (sessionName ?? '').trim() ||
+    null;
+
   const record: Evaluation = {
     id: input.id ?? newId(),
     student_id: input.student_id,
@@ -557,7 +576,7 @@ export async function saveEvaluation(input: SaveEvalInput): Promise<Evaluation> 
     evaluation_date: input.evaluation_date,
     label: input.label.trim(),
     scores: input.scores,
-    teacher_name: input.teacher_name ?? settings.teacher_name,
+    teacher_name: teacherName,
     updated_at: now,
     deleted: false,
   };
@@ -575,6 +594,102 @@ export async function saveEvaluation(input: SaveEvalInput): Promise<Evaluation> 
   return record;
 }
 
+export interface BulkFillTarget {
+  studentId: string;
+  /** معرّف الاستمارة المخطّطة أو المحفوظة — يُستخدم للتحديث في مكانها */
+  evalId?: string;
+  label: string;
+}
+
+export interface BulkFillInput {
+  gradeId: GradeId;
+  subjectId: SubjectId;
+  term: TermId;
+  kind: CriteriaKind;
+  scores: Record<string, number>;
+  targets: BulkFillTarget[];
+  teacher_name?: string | null;
+}
+
+export async function bulkFillEvaluations(input: BulkFillInput): Promise<{ updated: number; created: number }> {
+  const all = await read<Evaluation[]>(K.evaluations, []);
+  const now = new Date().toISOString();
+  const today = new Date().toISOString().slice(0, 10);
+
+  let sessionName: string | null = null;
+  try { sessionName = (await readSession())?.name ?? null; } catch { /* ignore */ }
+  const settings = await getSettings();
+  const teacherName =
+    (input.teacher_name ?? '').trim() ||
+    (settings.teacher_name ?? '').trim() ||
+    (sessionName ?? '').trim() ||
+    null;
+
+  const byId = new Map(all.map((e) => [e.id, e]));
+  let updated = 0;
+  let created = 0;
+
+  for (const t of input.targets) {
+    let existing: Evaluation | undefined;
+    if (t.evalId) existing = byId.get(t.evalId);
+    if (!existing) {
+      existing = all.find(
+        (e) =>
+          e.student_id === t.studentId &&
+          e.grade_id === input.gradeId &&
+          e.subject_id === input.subjectId &&
+          (e.term ?? 'term1') === input.term &&
+          e.evaluation_type === input.kind &&
+          (e.label ?? '') === t.label &&
+          !e.deleted
+      );
+    }
+
+    if (existing) {
+      const merged: Evaluation = {
+        ...existing,
+        evaluation_date: existing.evaluation_date || today,
+        label: t.label,
+        scores: input.scores,
+        teacher_name: teacherName,
+        updated_at: now,
+        deleted: false,
+      };
+      const idx = all.findIndex((e) => e.id === existing!.id);
+      if (idx >= 0) all[idx] = merged;
+      byId.set(existing.id, merged);
+      await enqueue({ table: 'evaluations', op: 'upsert', rowId: existing.id, payload: merged });
+      await clearDraft(draftKey(existing.student_id, input.kind, merged.evaluation_date));
+      updated++;
+    } else {
+      const id = newId();
+      const rec: Evaluation = {
+        id,
+        student_id: t.studentId,
+        grade_id: input.gradeId,
+        term: input.term,
+        subject_id: input.subjectId,
+        evaluation_type: input.kind,
+        evaluation_date: today,
+        label: t.label,
+        scores: input.scores,
+        teacher_name: teacherName,
+        updated_at: now,
+        deleted: false,
+        planned: true,
+        unit: input.kind === 'weekly' ? (unitFromLabel(t.label) ?? undefined) : undefined,
+      };
+      all.push(rec);
+      byId.set(id, rec);
+      await enqueue({ table: 'evaluations', op: 'upsert', rowId: id, payload: rec });
+      await clearDraft(draftKey(t.studentId, input.kind, today));
+      created++;
+    }
+  }
+
+  await write(K.evaluations, all);
+  return { updated, created };
+}
 export async function deleteEvaluation(id: string): Promise<void> {
   const all = await read<Evaluation[]>(K.evaluations, []);
   const i = all.findIndex((e) => e.id === id);

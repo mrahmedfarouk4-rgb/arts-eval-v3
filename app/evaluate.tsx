@@ -13,14 +13,15 @@ import {
 import type { GradeId, SubjectId, TermId } from '@/constants/criteria';
 import type { CriteriaKind } from '@/constants/criteria.data';
 import { c, sp, rad, fnt, fs, kindTone, scaleTone, scaleBg, subjectColor } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
 import { Button, Card, Badge, Banner, Progress, ModeToggle } from '@/components/pro-ui';
 import { formWarnings } from '@/lib/warnings';
 import { confirmAction } from '@/lib/dialog';
 import { useSession } from '@/lib/session';
 import {
   evaluationsForStudent, getDraft, saveDraft, saveEvaluation, deleteEvaluation,
-  clearDraftFor,
-  type Evaluation,
+  clearDraftFor, listStudentsByGrade,
+  type Evaluation, type Student,
 } from '@/lib/store';
 
 /* ------------------------------------------------------------------ */
@@ -82,6 +83,49 @@ export default function EvaluateScreen() {
   const [draftFound, setDraftFound] = useState(false);
   const [showWarnings, setShowWarnings] = useState(true);
   const [metaOpen, setMetaOpen] = useState(false);
+  const [gradeStudents, setGradeStudents] = useState<Student[]>([]);
+  const [focusedIndex, setFocusedIndex] = useState<number>(0);
+
+  useEffect(() => {
+    if (!gradeId) return;
+    listStudentsByGrade(gradeId).then(setGradeStudents).catch(() => {});
+  }, [gradeId]);
+
+  const currentIndex = useMemo(() => {
+    return gradeStudents.findIndex((s) => s.id === studentId);
+  }, [gradeStudents, studentId]);
+
+  const prevStudent = currentIndex > 0 ? gradeStudents[currentIndex - 1] : null;
+  const nextStudent = currentIndex >= 0 && currentIndex < gradeStudents.length - 1 ? gradeStudents[currentIndex + 1] : null;
+
+  const navigateToStudent = useCallback(
+    (target: Student) => {
+      if (Object.keys(scores).length > 0) {
+        saveDraft({
+          student_id: studentId,
+          grade_id: gradeId,
+          subject_id: subjectId,
+          evaluation_type: kind,
+          evaluation_date: date,
+          label,
+          scores,
+        }).catch(() => {});
+      }
+      router.replace({
+        pathname: '/evaluate',
+        params: {
+          studentId: target.id,
+          studentName: target.name,
+          gradeId,
+          subjectId,
+          kind,
+          term,
+          from: params.from,
+        },
+      });
+    },
+    [scores, studentId, gradeId, subjectId, kind, date, label, term, params.from, router]
+  );
 
   /**
    * هوية الاستمارة المعروضة. كان الحارس `loadedRef` عمّالاً مرّة واحدة
@@ -101,23 +145,46 @@ export default function EvaluateScreen() {
     [kind, gradeId, subjectId, term]
   );
 
+  const isFinal = kind === 'final';
   const n = totals.criteria.length;
   const score = sumScores(scores, totals.criteria);
   const level = levelFor(kind, score);
-  const ratedCount = totals.criteria.filter((x) => normalizedValue(scores[x.id]) !== undefined).length;
+
+  /**
+   * درجة البند كما هي محفوظة.
+   * التكويني والمرحلي سلم رباعي (1..4) كما في الكليشة. أما الختامي فدرجة
+   * كل بند في الوثيقة متغيّرة (5..8) والورقة الرسمية تطبع «درجة الطالب»
+   * رقماً — وحصرها في 1..4 هو سبب ظهور 32/50 عند «تعبئة يتخطى».
+   */
+  const valueOf = useCallback(
+    (x: { id: string; max: number }) =>
+      isFinal ? finalValue(scores[x.id], x.max) : normalizedValue(scores[x.id]),
+    [scores, isFinal]
+  );
+
+  const ratedCount = totals.criteria.filter((x) => valueOf(x) !== undefined).length;
   const missing = n - ratedCount;
-  const isFinal = kind === 'final';
   const tone = kindTone[kind];
   const subColor = subjectColor(subjectId);
 
-  /** عدد البنود في كل مستوى — لمخطط الملخص */
+  /** عدد البنود في كل مستوى — لمخطط الملخص (الختامي له حسابه الخاص) */
   const dist = useMemo(
     () =>
       SCALE.map((o) => ({
         o,
-        count: totals.criteria.filter((x) => normalizedValue(scores[x.id]) === o.v).length,
+        count: totals.criteria.filter((x) => valueOf(x) === o.v).length,
       })),
-    [totals.criteria, scores]
+    [totals.criteria, valueOf]
+  );
+
+  /** للختامي: عدد البنود التي بلغت درجة التحقق — السلم الرباعي لا ينطبق */
+  const passCount = useMemo(
+    () =>
+      totals.criteria.filter((x) => {
+        const v = valueOf(x);
+        return v !== undefined && v >= (x.pass ?? x.max);
+      }).length,
+    [totals.criteria, valueOf]
   );
 
   const cellHistory = useMemo(
@@ -213,26 +280,46 @@ export default function EvaluateScreen() {
   }, [scores, label, date, editMode, studentId, gradeId, subjectId, kind]);
 
   /* ---------------- اختيار درجة بند ---------------- */
-  const pick = (criterionId: string, value: number) => {
+  const pick = useCallback((criterionId: string, value: number) => {
     if (!editMode) return;
     setScores((prev) => ({ ...prev, [criterionId]: value }));
-  };
+  }, [editMode]);
 
-  /** يعبّئ كل البنود غير المقيّمة بدرجة واحدة */
-  const fillRemaining = async (value: 1 | 2 | 3 | 4) => {
+  /**
+   * يعبّئ **كل** البنود بدرجة واحدة، بما فيها البنود المقيّمة سابقاً.
+   * كان يقتصر على البنود الفارغة، فمن أراد تغيير تقييم كامل عليه
+   * الضغط على «مسح الكل» أولاً — وهو ما طلبه المستخدم بإلغائه.
+   *
+   * وفي التقييم الختامي لا سلم رباعي: كل بند له درجة قصوى ودرجة تحقق
+   * مختلفة، فـ«يتخطى» = الدرجة القصوى للبند و«حقق» = درجة التحقق.
+   */
+  const fillAll = async (target: 'max' | 'pass') => {
+    const what = isFinal
+      ? target === 'max'
+        ? 'الدرجة القصوى لكل بند'
+        : 'درجة التحقق لكل بند'
+      : `درجة «${SCALE[target === 'max' ? 3 : 2].label}» (${target === 'max' ? 4 : 3})`;
+
     const ok = await confirmAction(
-      'تعبئة البنود المتبقية',
-      `سيتم ضبط ${missing} بند على «${SCALE[value - 1].label}». هل تريد المتابعة؟`,
+      'تعبئة كل البنود',
+      ratedCount > 0
+        ? `سيتم ضبط كل البنود (${n}) على ${what}، وسيُستبدل ${ratedCount} بند مقيّم سابقاً. هل تريد المتابعة؟`
+        : `سيتم ضبط كل البنود (${n}) على ${what}. هل تريد المتابعة؟`,
       { confirmLabel: 'تعبئة' }
     );
     if (!ok) return;
-    setScores((prev) => {
-      const next = { ...prev };
-      for (const x of totals.criteria) {
-        if (normalizedValue(next[x.id]) === undefined) next[x.id] = value;
-      }
-      return next;
-    });
+
+    const next: Record<string, number> = {};
+    for (const x of totals.criteria) {
+      next[x.id] = isFinal
+        ? target === 'max'
+          ? x.max
+          : (x.pass ?? x.max)
+        : target === 'max'
+          ? 4
+          : 3;
+    }
+    setScores(next);
   };
 
   const clearAll = async () => {
@@ -246,7 +333,7 @@ export default function EvaluateScreen() {
   };
 
   /* ---------------- الحفظ ---------------- */
-  const onSave = async (printAfter: boolean) => {
+    const onSave = async (printAfter: boolean) => {
     if (!editMode) {
       Alert.alert('وضع العرض فقط', 'فعّل وضع التعديل للحفظ.');
       return;
@@ -268,8 +355,6 @@ export default function EvaluateScreen() {
         scores,
         teacher_name: teacherName,
       });
-      // المسودة كانت تُقدَّم على التقييم المحفوظ في شاشة الطباعة،
-      // فبعد الحفظ تُمحى وإلا طُبعت درجات أقدم من المحفوظ.
       await clearDraftFor(studentId, kind, saved.evaluation_date);
       await loadHistory();
       setEditingId(null);
@@ -293,6 +378,113 @@ export default function EvaluateScreen() {
     }
   };
 
+const onSaveAndNext = async () => {
+    if (!editMode) {
+      Alert.alert('وضع العرض فقط', 'فعّل وضع التعديل للحفظ.');
+      return;
+    }
+    if (ratedCount === 0) {
+      Alert.alert('لم يتم التقييم', 'اختر درجة واحدة على الأقل قبل الحفظ.');
+      return;
+    }
+    try {
+      const saved = await saveEvaluation({
+        id: editingId ?? undefined,
+        student_id: studentId,
+        grade_id: gradeId,
+        term,
+        subject_id: subjectId,
+        evaluation_type: kind,
+        evaluation_date: date || todayISO(),
+        label,
+        scores,
+        teacher_name: teacherName,
+      });
+      await clearDraftFor(studentId, kind, saved.evaluation_date);
+      if (nextStudent) {
+        navigateToStudent(nextStudent);
+      } else {
+        Alert.alert('اكتمل الفصل', 'تم حفظ التقييم بنجاح. لقد انتهيت من جميع طلاب هذا الفصل!');
+        goBack();
+      }
+    } catch (e) {
+      Alert.alert('خطأ', e instanceof Error ? e.message : 'تعذّر الحفظ');
+    }
+  };
+
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const onSaveAndNextRef = useRef(onSaveAndNext);
+  onSaveAndNextRef.current = onSaveAndNext;
+  const navigateToStudentRef = useRef(navigateToStudent);
+  navigateToStudentRef.current = navigateToStudent;
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
+
+  // اختصارات لوحة المفاتيح للويب والأجهزة اللوحية
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
+        const val = parseInt(e.key, 10);
+        const curr = totals.criteria[focusedIndex];
+        if (curr && editMode) {
+          pickRef.current(curr.id, val);
+          if (focusedIndex < totals.criteria.length - 1) {
+            setFocusedIndex((prev) => prev + 1);
+          }
+        }
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedIndex((prev) => Math.min(totals.criteria.length - 1, prev + 1));
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedIndex((prev) => Math.max(0, prev - 1));
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (nextStudent) navigateToStudentRef.current(nextStudent);
+        return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (prevStudent) navigateToStudentRef.current(prevStudent);
+        return;
+      }
+
+      if (e.key === 'Enter' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's')) {
+        e.preventDefault();
+        if (editMode && ratedCount > 0) {
+          if (nextStudent) {
+            onSaveAndNextRef.current();
+          } else {
+            onSaveRef.current(false);
+          }
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [totals.criteria, focusedIndex, editMode, ratedCount, nextStudent, prevStudent]);
+
   const onDelete = async (id: string) => {
     const ok = await confirmAction(
       'حذف التقييم',
@@ -314,6 +506,37 @@ export default function EvaluateScreen() {
     <SafeAreaView style={s.root} edges={['top', 'bottom']}>
       {/* ================= الترويسة الثابتة باللون المميز ================= */}
       <View style={[s.head, { backgroundColor: subColor }]}>
+        {/* شريط التنقل السريع بين طلاب الفصل */}
+        {gradeStudents.length > 0 && (
+          <View style={s.navRow}>
+            <Pressable
+              disabled={!prevStudent}
+              onPress={() => prevStudent && navigateToStudent(prevStudent)}
+              style={({ pressed }) => [s.navBtn, !prevStudent && s.navBtnDisabled, pressed && { opacity: 0.7 }]}
+              accessibilityLabel="الطالب السابق"
+            >
+              <Ionicons name="chevron-forward" size={13} color={prevStudent ? '#FFFFFF' : 'rgba(255,255,255,0.45)'} />
+              <Text style={[s.navBtnText, { color: prevStudent ? '#FFFFFF' : 'rgba(255,255,255,0.45)' }]}>السابق</Text>
+            </Pressable>
+
+            <View style={[s.navBadge, { backgroundColor: 'rgba(255,255,255,0.20)' }]}>
+              <Text style={[s.navBadgeText, { color: '#FFFFFF' }]}>
+                طالب {currentIndex >= 0 ? currentIndex + 1 : '—'} من {gradeStudents.length}
+              </Text>
+            </View>
+
+            <Pressable
+              disabled={!nextStudent}
+              onPress={() => nextStudent && navigateToStudent(nextStudent)}
+              style={({ pressed }) => [s.navBtn, !nextStudent && s.navBtnDisabled, pressed && { opacity: 0.7 }]}
+              accessibilityLabel="الطالب التالي"
+            >
+              <Text style={[s.navBtnText, { color: nextStudent ? '#FFFFFF' : 'rgba(255,255,255,0.45)' }]}>التالي</Text>
+              <Ionicons name="chevron-back" size={13} color={nextStudent ? '#FFFFFF' : 'rgba(255,255,255,0.45)'} />
+            </Pressable>
+          </View>
+        )}
+
         <View style={s.headRow}>
           <Pressable onPress={goBack} hitSlop={10} style={s.headBtnSolid} accessibilityLabel="رجوع">
             <Ionicons name="chevron-forward" size={19} color="#FFFFFF" />
@@ -425,22 +648,18 @@ export default function EvaluateScreen() {
 
           {editMode && (
             <View style={s.metaTools}>
-              {missing > 0 && (
-                <>
-                  <ToolBtn
-                    label={`تعبئة المتبقي (${missing})`}
-                    icon="checkmark-done-outline"
-                    tone={c.primary}
-                    onPress={() => fillRemaining(3)}
-                  />
-                  <ToolBtn
-                    label="تعيين 4"
-                    icon="arrow-up-circle-outline"
-                    tone={scaleTone[3]}
-                    onPress={() => fillRemaining(4)}
-                  />
-                </>
-              )}
+              <ToolBtn
+                label={isFinal ? 'تعبئة يتخطى (القصوى)' : 'تعبئة يتخطى (٤)'}
+                icon="checkmark-done-outline"
+                tone={c.primary}
+                onPress={() => fillAll('max')}
+              />
+              <ToolBtn
+                label={isFinal ? 'تعبئة حقق (التحقق)' : 'تعبئة حقق (٣)'}
+                icon="checkmark-circle-outline"
+                tone={scaleTone[2]}
+                onPress={() => fillAll('pass')}
+              />
               <ToolBtn
                 label="مسح الكل"
                 icon="refresh-outline"
@@ -508,7 +727,7 @@ export default function EvaluateScreen() {
           {editMode && (
             <View style={s.quickBar}>
               <Pressable
-                onPress={() => fillRemaining(4)}
+                onPress={() => fillAll('max')}
                 style={({ pressed }) => [
                   s.quickBtn,
                   { backgroundColor: scaleTone[3] },
@@ -516,11 +735,13 @@ export default function EvaluateScreen() {
                 ]}
               >
                 <Ionicons name="sparkles" size={13} color="#FFFFFF" />
-                <Text style={s.quickBtnText}>تعبئة يتخطى (٤)</Text>
+                <Text style={s.quickBtnText}>
+                  {isFinal ? 'تعبئة يتخطى (القصوى)' : 'تعبئة يتخطى (٤)'}
+                </Text>
               </Pressable>
 
               <Pressable
-                onPress={() => fillRemaining(3)}
+                onPress={() => fillAll('pass')}
                 style={({ pressed }) => [
                   s.quickBtn,
                   { backgroundColor: scaleTone[2] },
@@ -528,7 +749,9 @@ export default function EvaluateScreen() {
                 ]}
               >
                 <Ionicons name="checkmark-done" size={13} color="#FFFFFF" />
-                <Text style={s.quickBtnText}>تعبئة حقق (٣)</Text>
+                <Text style={s.quickBtnText}>
+                  {isFinal ? 'تعبئة حقق (التحقق)' : 'تعبئة حقق (٣)'}
+                </Text>
               </Pressable>
 
               {ratedCount > 0 && (
@@ -561,7 +784,7 @@ export default function EvaluateScreen() {
                 text={x.text}
                 pass={isFinal ? (x.pass ?? undefined) : undefined}
                 cmax={x.max}
-                value={normalizedValue(scores[x.id])}
+                value={valueOf(x)}
                 isFinal={isFinal}
                 editMode={editMode}
                 onPick={(v) => pick(x.id, v)}
@@ -589,19 +812,41 @@ export default function EvaluateScreen() {
 
               {/* مخطط التوزيع */}
               <View style={{ gap: sp.xs, marginTop: sp.lg }}>
-                {dist.map(({ o, count }) => {
-                  const col = scaleTone[o.v - 1];
-                  const pct = n > 0 ? (count / n) * 100 : 0;
-                  return (
-                    <View key={o.v} style={s.distRow}>
-                      <Text style={[s.distLabel, { color: col }]}>{o.label}</Text>
-                      <View style={s.distTrack}>
-                        <View style={[s.distFill, { width: `${pct}%`, backgroundColor: col }]} />
+                {isFinal ? (
+                  <>
+                    {[
+                      { key: 'pass', label: 'بلغ درجة التحقق', count: passCount, col: c.ok },
+                      { key: 'below', label: 'دون درجة التحقق', count: ratedCount - passCount, col: c.warn },
+                    ].map(({ key, label, count, col }) => (
+                      <View key={key} style={s.distRow}>
+                        <Text style={[s.distLabel, { color: col }]}>{label}</Text>
+                        <View style={s.distTrack}>
+                          <View
+                            style={[
+                              s.distFill,
+                              { width: `${n > 0 ? (count / n) * 100 : 0}%`, backgroundColor: col },
+                            ]}
+                          />
+                        </View>
+                        <Text style={s.distCount}>{count}</Text>
                       </View>
-                      <Text style={s.distCount}>{count}</Text>
-                    </View>
-                  );
-                })}
+                    ))}
+                  </>
+                ) : (
+                  dist.map(({ o, count }) => {
+                    const col = scaleTone[o.v - 1];
+                    const pct = n > 0 ? (count / n) * 100 : 0;
+                    return (
+                      <View key={o.v} style={s.distRow}>
+                        <Text style={[s.distLabel, { color: col }]}>{o.label}</Text>
+                        <View style={s.distTrack}>
+                          <View style={[s.distFill, { width: `${pct}%`, backgroundColor: col }]} />
+                        </View>
+                        <Text style={s.distCount}>{count}</Text>
+                      </View>
+                    );
+                  })
+                )}
                 <View style={s.distRow}>
                   <Text style={[s.distLabel, { color: c.text4 }]}>بلا تقييم</Text>
                   <View style={s.distTrack}>
@@ -690,21 +935,41 @@ function CriterionRow({
   text: string;
   pass?: number;
   cmax: number;
-  value?: 1 | 2 | 3 | 4;
+  value?: number;
   isFinal: boolean;
   editMode: boolean;
   onPick: (v: number) => void;
 }) {
   const on = value !== undefined;
-  const col = value !== undefined ? scaleTone[value - 1] : undefined;
-  const passed = isFinal && pass != null && value !== undefined && value >= pass;
+  const passed = isFinal && pass != null && typeof value === 'number' && value >= pass;
+  /** لون السطر: الختامي بلون النجاح/التنبيه، والبقية بلون الدرجة الرباعية */
+  const col =
+    typeof value === 'number'
+      ? isFinal
+        ? passed
+          ? c.ok
+          : c.warn
+        : value >= 1 && value <= 4
+          ? scaleTone[value - 1]
+          : undefined
+      : undefined;
+  const bg =
+    typeof value === 'number'
+      ? isFinal
+        ? passed
+          ? c.okBg
+          : c.warnBg
+        : value >= 1 && value <= 4
+          ? scaleBg[value - 1]
+          : undefined
+      : undefined;
   const rowColor = [c.primary, c.brandSecondary, c.orange, c.mint, c.blueMid, c.pinkMid, c.peach][index % 7];
 
   return (
     <View style={[s.row, on && s.rowOn, on && col ? { borderColor: col } : null, { borderLeftWidth: 4, borderLeftColor: rowColor }]}>
       {/* السطر الأول: الرقم + النص + درجة التحقق */}
       <View style={s.rowTop}>
-        <View style={[s.rowNum, on && col ? { backgroundColor: scaleBg[(value ?? 1) - 1] } : null]}>
+        <View style={[s.rowNum, on && bg ? { backgroundColor: bg } : null]}>
           <Text style={[s.rowNumText, on && col ? { color: col } : null]}>{index + 1}</Text>
         </View>
 
@@ -719,33 +984,92 @@ function CriterionRow({
         )}
       </View>
 
-      {/* السطر الثاني: خيارات الدرجة */}
-      <View style={s.rowOpts}>
-        {SCALE.map((o) => {
-          const sel = value === o.v;
-          const kc = scaleTone[o.v - 1];
-          return (
-            <Pressable
-              key={o.v}
-              onPress={() => onPick(o.v)}
-              disabled={!editMode}
-              style={({ pressed }) => [
-                s.opt,
-                sel && { backgroundColor: kc, borderColor: kc },
-                pressed && !editMode && { opacity: 0.6 },
-              ]}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: sel, disabled: !editMode }}
-              accessibilityLabel={`${o.label} — ${o.v} من ${cmax}`}
-            >
-              <Text style={[s.optNum, sel && s.optNumOn]}>{o.v}</Text>
-              <Text style={[s.optLabel, sel && s.optLabelOn]} numberOfLines={1}>
-                {o.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {/* السطر الثاني: إدخال الدرجة */}
+      {isFinal ? (
+        <View style={s.finalOpts}>
+          <Pressable
+            onPress={() => onPick(Math.max(1, (value ?? 0) - 1))}
+            disabled={!editMode}
+            style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button"
+            accessibilityLabel="إنقاص الدرجة"
+          >
+            <Ionicons name="remove" size={17} color={c.text2} />
+          </Pressable>
+
+          <View style={[s.stepValue, on && col ? { borderColor: col, backgroundColor: bg } : null]}>
+            <Text style={[s.stepValueText, on && col ? { color: col } : null]}>
+              {value ?? '—'}
+            </Text>
+            <Text style={s.stepMax}>/{cmax}</Text>
+          </View>
+
+          <Pressable
+            onPress={() => onPick(Math.min(cmax, (value ?? 0) + 1))}
+            disabled={!editMode}
+            style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button"
+            accessibilityLabel="زيادة الدرجة"
+          >
+            <Ionicons name="add" size={17} color={c.text2} />
+          </Pressable>
+
+          <View style={{ flex: 1 }} />
+
+          <Pressable
+            onPress={() => onPick(pass ?? cmax)}
+            disabled={!editMode}
+            style={({ pressed }) => [
+              s.quickPick,
+              { borderColor: c.ok },
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="button"
+          >
+            <Text style={[s.quickPickText, { color: c.ok }]}>التحقق {pass ?? cmax}</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => onPick(cmax)}
+            disabled={!editMode}
+            style={({ pressed }) => [
+              s.quickPick,
+              { borderColor: c.primary },
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="button"
+          >
+            <Text style={[s.quickPickText, { color: c.primary }]}>القصوى {cmax}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={s.rowOpts}>
+          {SCALE.map((o) => {
+            const sel = value === o.v;
+            const kc = scaleTone[o.v - 1];
+            return (
+              <Pressable
+                key={o.v}
+                onPress={() => onPick(o.v)}
+                disabled={!editMode}
+                style={({ pressed }) => [
+                  s.opt,
+                  sel && { backgroundColor: kc, borderColor: kc },
+                  pressed && !editMode && { opacity: 0.6 },
+                ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: sel, disabled: !editMode }}
+                accessibilityLabel={`${o.label} — ${o.v} من ${cmax}`}
+              >
+                <Text style={[s.optNum, sel && s.optNumOn]}>{o.v}</Text>
+                <Text style={[s.optLabel, sel && s.optLabelOn]} numberOfLines={1}>
+                  {o.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -807,6 +1131,15 @@ function todayISO(): string {
  */
 function normalizedValue(v: number | undefined): 1 | 2 | 3 | 4 | undefined {
   return v != null && v >= 1 && v <= 4 ? ((v as 1 | 2 | 3 | 4)) : undefined;
+}
+
+/**
+ * درجة بند التقويم الختامي — رقم من 1 إلى الدرجة القصوى للبند.
+ * درجات الختامي في الوثائق متغيّرة (5..8) لا سلم رباعي، والورقة
+ * الرسمية تطبع «درجة الطالب» رقماً في هذا النطاق.
+ */
+function finalValue(v: number | undefined, max: number): number | undefined {
+  return v != null && Number.isFinite(v) && v >= 1 && v <= max ? v : undefined;
 }
 
 /* ================================================================== */
@@ -886,6 +1219,54 @@ const s = StyleSheet.create({
   },
   quickBtnClearText: { fontFamily: fnt.m, fontSize: 10.5, color: c.err },
 
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 2,
+  },
+  navBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: rad.sm,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  navBtnDisabled: {
+    opacity: 0.35,
+  },
+  navBtnText: {
+    fontFamily: fnt.b,
+    fontSize: 11,
+  },
+  navBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: rad.pill,
+  },
+  navBadgeText: {
+    fontFamily: fnt.m,
+    fontSize: 11,
+  },
+  quickBtnHistory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: sp.md,
+    paddingVertical: 6,
+    borderRadius: rad.pill,
+    backgroundColor: c.bg,
+    borderWidth: 1,
+    borderColor: c.primary + '30',
+  },
+  quickBtnHistoryText: {
+    fontFamily: fnt.b,
+    fontSize: 11,
+    color: c.primary,
+  },
+
   /* اللوح الجانبي */
   metaPanel: {
     paddingHorizontal: sp.lg, paddingVertical: sp.md,
@@ -924,6 +1305,7 @@ const s = StyleSheet.create({
 
   /* المحتوى */
   scroll: {
+    ...contentColumn,
     paddingHorizontal: sp.lg,
     paddingTop: sp.lg,
     paddingBottom: sp.xl,
@@ -976,6 +1358,30 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: c.line,
     backgroundColor: c.bg,
   },
+
+  /* إدخال درجة التقويم الختامي — رقم متغيّر لكل بند */
+  finalOpts: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingRight: 30,
+  },
+  stepBtn: {
+    width: 34, height: 34, borderRadius: rad.sm,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: c.line, backgroundColor: c.bg,
+  },
+  stepValue: {
+    minWidth: 62, height: 34, borderRadius: rad.sm,
+    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center',
+    gap: 1, paddingHorizontal: sp.sm,
+    borderWidth: 1.5, borderColor: c.line, backgroundColor: c.bg,
+  },
+  stepValueText: { fontFamily: fnt.bk, fontSize: fs.md, color: c.text4 },
+  stepMax: { fontFamily: fnt.b, fontSize: 9.5, color: c.text4 },
+  quickPick: {
+    height: 34, borderRadius: rad.sm, justifyContent: 'center',
+    paddingHorizontal: sp.sm, borderWidth: 1, backgroundColor: c.bg,
+  },
+  quickPickText: { fontFamily: fnt.b, fontSize: 9.5 },
   optNum: { fontFamily: fnt.bk, fontSize: fs.xs, color: c.text4 },
   optLabel: { fontFamily: fnt.m, fontSize: 9, color: c.text3 },
   optNumOn: { color: 'rgba(255,255,255,0.9)' },

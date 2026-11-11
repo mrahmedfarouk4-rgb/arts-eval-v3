@@ -392,24 +392,44 @@ export type GradeTone = {
   onBase: string;
   /** نص ثانوي فوق base */
   onBaseMuted: string;
+  /**
+   * درجة أكثر تشبعاً من العائلة نفسها — تُستخدم في تدرّج الهيرو والبطاقة
+   * المحددة. مشتقة من اللوحة وليست لوناً جديداً خارجها.
+   */
+  vivid: string;
+  /** درجة توهج مشتقة من العائلة — لظلّ البطاقات العائمة والهالات */
+  glow: string;
+  /**
+   * تدرّج الهيرو: الطرف المضيء أعلى اليمين، ثم base، ثم أفتح/أعمق درجة
+   * أسفل اليسار — بحيث يبقى onBase مقروءاً في كل نقطة.
+   */
+  hero: readonly [string, string, string];
 };
 
 export const GRADE_TONES: Record<string, GradeTone> = {
   grade4: {
     base: '#004645', deep: '#003635', tint: 'rgba(0, 70, 69, 0.10)', chipBg: '#E6EDEC',
     onBase: '#FFFFFF', onBaseMuted: 'rgba(255, 255, 255, 0.78)',
+    vivid: '#006B66', glow: '#2FB8A4',
+    hero: ['#006B66', '#004645', '#003635'],
   },
   grade5: {
     base: '#621244', deep: '#4A0D33', tint: 'rgba(98, 18, 68, 0.10)', chipBg: '#EFE7EC',
     onBase: '#FFFFFF', onBaseMuted: 'rgba(255, 255, 255, 0.78)',
+    vivid: '#8A1A60', glow: '#C2428D',
+    hero: ['#8A1A60', '#621244', '#4A0D33'],
   },
   grade_int1: {
     base: '#83C3EB', deep: '#262674', tint: 'rgba(131, 195, 235, 0.18)', chipBg: '#E9F4FB',
-    onBase: '#171717', onBaseMuted: 'rgba(23, 23, 23, 0.72)',
+    onBase: '#171717', onBaseMuted: 'rgba(23, 23, 23, 0.80)',
+    vivid: '#2E93D4', glow: '#38BDF8',
+    hero: ['#2E93D4', '#83C3EB', '#C0E1F7'],
   },
   grade_int2: {
     base: '#D17E30', deep: '#B86A22', tint: 'rgba(209, 126, 48, 0.14)', chipBg: '#F9EDE2',
     onBase: '#171717', onBaseMuted: 'rgba(23, 23, 23, 0.85)',
+    vivid: '#D96A14', glow: '#F5A623',
+    hero: ['#D96A14', '#D17E30', '#FDDCC8'],
   },
 };
 

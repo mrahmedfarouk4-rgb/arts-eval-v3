@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, Platform, Pressable, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import {
 import type { GradeId, SubjectId } from '@/constants/criteria';
 import type { CriteriaKind } from '@/constants/criteria.data';
 import { c as p, sp, rad, fnt, fs, kindTone } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
 import { Button, Card, Banner, Section, TopBar, Stat, Segmented } from '@/components/pro-ui';
 import { useSession } from '@/lib/session';
 import { buildPrintHtml, toPrintRow, type PrintRow } from '@/lib/print-html';
@@ -46,8 +47,49 @@ export default function PrintScreen() {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [label, setLabel] = useState(params.label ?? '');
   const [date, setDate] = useState(params.date ?? todayISO());
-  const [round, setRound] = useState<'all' | 'latest'>('all');
+  const [pickMode, setPickMode] = useState<'all' | 'specific'>('all');
+  const [pickValue, setPickValue] = useState<'latest' | number>('latest');
   const [busy, setBusy] = useState(false);
+
+  /**
+   * اسم المعلم على الورقة.
+   * -------------------------------------------------------------------
+   * كان يُؤخذ من الجلسة وحدها، فإن كان حساب الضيف بلا اسم أو حُفظ
+   * التقييم قديماً بلا `teacher_name` ظهرت في الطباعة شرطة «—».
+   * صار قابلاً للكتابة/التعديل هنا، ويُرجَّح عليه اسم المعلم المحفوظ
+   * مع التقييم ثم اسم الجلسة، فلا تُطبع ورقة بلا اسم معلم.
+   */
+  const [teacher, setTeacher] = useState(teacherName ?? '');
+  /** اسم المعلم المحفوظ في التقييم المعروض (إن وُجد) */
+  const [savedTeacher, setSavedTeacher] = useState('');
+  /** هل عدّل المستخدم اسم المعلم يدوياً؟ (لمنع الاستمارة المحفوظة من إلغاء ما كُتب) */
+  const teacherEditedRef = useRef(false);
+
+  useEffect(() => {
+    setTeacher((cur) => cur || teacherName || '');
+  }, [teacherName]);
+
+  /** الاسم الفعلي الذي سيُطبع — الحقل (إن عُدّل) ثم المحفوظ مع التقييم */
+  const resolveTeacher = (saved?: string | null) =>
+    teacher.trim() ||
+    (saved ?? '').trim() ||
+    savedTeacher.trim() ||
+    (teacherName ?? '').trim();
+
+  /** لا نسمح بالطباعة بلا اسم معلم — يُطبع مكانه شرطة في الكليشة */
+  const requireTeacher = (saved?: string | null, allowLoaded = true): string | null => {
+    const name = allowLoaded
+      ? resolveTeacher(saved)
+      : teacherEditedRef.current
+        ? teacher.trim() || (saved ?? '').trim() || (teacherName ?? '').trim()
+        : teacher.trim() || (saved ?? '').trim() || (teacherName ?? '').trim();
+    if (name) return name;
+    Alert.alert(
+      'اسم المعلم مطلوب',
+      'اكتب اسم المعلم في الحقل أعلى الشاشة ليظهر في الاستمارة المطبوعة.'
+    );
+    return null;
+  };
 
   const gradeId = (params.gradeId ?? '') as GradeId;
   const subjectId = (params.subjectId ?? '') as SubjectId;
@@ -62,6 +104,19 @@ export default function PrintScreen() {
     mode + '|' + (params.studentId ?? '') + '|' + (params.evalId ?? '') + '|' +
     gradeId + '|' + subjectId + '|' + kind + '|' +
     (params.label ?? '') + '|' + (params.date ?? '');
+
+  const targetKey = (params.studentId ?? '') + '|' + (params.evalId ?? '') + '|' + gradeId + '|' + subjectId + '|' + kind;
+  const prevTargetKeyRef = useRef(targetKey);
+  useEffect(() => {
+    if (prevTargetKeyRef.current !== targetKey) {
+      prevTargetKeyRef.current = targetKey;
+      teacherEditedRef.current = false;
+    }
+  }, [targetKey]);
+
+  useEffect(() => {
+    setSavedTeacher('');
+  }, [printKey]);
 
   useEffect(() => {
     const sid = params.studentId;
@@ -80,6 +135,8 @@ export default function PrintScreen() {
         setScores(justSaved.scores ?? {});
         setLabel(justSaved.label ?? '');
         setDate(justSaved.evaluation_date);
+        setSavedTeacher(justSaved.teacher_name ?? '');
+        if (justSaved.teacher_name && !teacherEditedRef.current) setTeacher(justSaved.teacher_name);
         return;
       }
       const d = await getDraft(sid, kind, date);
@@ -96,6 +153,8 @@ export default function PrintScreen() {
         setScores(match[0].scores ?? {});
         setLabel(match[0].label ?? '');
         setDate(match[0].evaluation_date);
+        setSavedTeacher(match[0].teacher_name ?? '');
+        if (match[0].teacher_name && !teacherEditedRef.current) setTeacher(match[0].teacher_name);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,7 +174,7 @@ export default function PrintScreen() {
     })();
   }, []);
 
-  // كل تقييمات الصف/المقرر المختار
+  // تقييمات الصف/المقرر المختار — كل الأنواع (لحساب الأعداد)
   const cellEvals = useMemo(() => {
     if (!gradeId || !subjectId) return [];
     return allEvals
@@ -127,19 +186,64 @@ export default function PrintScreen() {
       );
   }, [allEvals, gradeId, subjectId, names]);
 
-  /** latest: آخر تقييم لكل طالب */
-  const batchRows: PrintRow[] = useMemo(() => {
-    let list = cellEvals;
-    if (round === 'latest') {
-      const latest = new Map<string, Evaluation>();
-      for (const e of list) {
-        const prev = latest.get(e.student_id);
-        if (!prev || e.evaluation_date > prev.evaluation_date) latest.set(e.student_id, e);
-      }
-      list = [...latest.values()];
+  // تقييمات النوع المختار فقط — للطباعة
+  const kindCellEvals = useMemo(
+    () => cellEvals.filter((e) => e.evaluation_type === kind),
+    [cellEvals, kind]
+  );
+
+  // أقصى عدد تقييمات لطالب واحد (للنوع المختار) — لبناء خيارات "تقييم n"
+  const maxPick = useMemo(() => {
+    const byStudent = new Map<string, number>();
+    for (const e of kindCellEvals) {
+      byStudent.set(e.student_id, (byStudent.get(e.student_id) ?? 0) + 1);
     }
-    return list.map((e) => toPrintRow(e, names[e.student_id] ?? 'طالب', term));
-  }, [cellEvals, round, names, term]);
+    return byStudent.size ? Math.max(...byStudent.values()) : 0;
+  }, [kindCellEvals]);
+
+  /** اختيار التقييمات للطباعة */
+  const batchRows: PrintRow[] = useMemo(() => {
+    let list = kindCellEvals;
+    if (pickMode === 'specific') {
+      if (pickValue === 'latest') {
+        const latest = new Map<string, Evaluation>();
+        for (const e of kindCellEvals) {
+          const prev = latest.get(e.student_id);
+          if (!prev || e.evaluation_date > prev.evaluation_date) latest.set(e.student_id, e);
+        }
+        list = [...latest.values()];
+      } else {
+        const n = pickValue as number;
+        const byStudent = new Map<string, Evaluation[]>();
+        for (const e of kindCellEvals) {
+          const arr = byStudent.get(e.student_id) ?? [];
+          arr.push(e);
+          byStudent.set(e.student_id, arr);
+        }
+        const picked: Evaluation[] = [];
+        for (const arr of byStudent.values()) {
+          const sorted = [...arr].sort((a, b) => a.evaluation_date.localeCompare(b.evaluation_date));
+          if (sorted[n - 1]) picked.push(sorted[n - 1]);
+        }
+        list = picked;
+      }
+    }
+    return list.map((e) => {
+      const row = toPrintRow(e, names[e.student_id] ?? 'طالب', term);
+      /** 
+       * إن عدّل المستخدم اسم المعلم في الحقل، يُطبَّق على جميع الأوراق.
+       * وإلا: اسم الاستمارة المحفوظ، ثم الاسم المكتوب، ثم جلسة المستخدم.
+       */
+      const rowTeacher = teacher.trim() || row.evaluation.teacher || teacherName || '';
+      return {
+        ...row,
+        evaluation: {
+          ...row.evaluation,
+          teacher: rowTeacher,
+        },
+      };
+    });
+  }, [kindCellEvals, pickMode, pickValue, names, term, teacher, teacherName]);
 
   const totals = useMemo(
     () => (gradeId && subjectId ? formTotals(kind, gradeId, subjectId, term) : null),
@@ -149,6 +253,8 @@ export default function PrintScreen() {
   /* ---------------- الطباعة ---------------- */
 
   const printSingle = async () => {
+    const teacherOnSheet = requireTeacher(savedTeacher);
+    if (!teacherOnSheet) return;
     setBusy(true);
     try {
       const row: PrintRow = {
@@ -158,7 +264,7 @@ export default function PrintScreen() {
           date,
           label,
           scores,
-          teacher: teacherName ?? '',
+          teacher: teacherOnSheet,
         },
         kind,
         gradeId,
@@ -179,6 +285,7 @@ export default function PrintScreen() {
       Alert.alert('لا توجد بيانات', 'لا توجد تقييمات لهذا المقرر بعد.');
       return;
     }
+    if (!requireTeacher(null, false)) return;
     setBusy(true);
     try {
       await emit(buildPrintHtml(batchRows, term));
@@ -240,6 +347,28 @@ export default function PrintScreen() {
       />
 
       <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+        {/* اسم المعلم — يُطبع في كل استمارة، فردية أو دفعة كاملة */}
+        <View style={st.teacherCard}>
+          <View style={st.teacherIcon}>
+            <Ionicons name="person" size={16} color={p.primary} />
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={st.teacherLabel}>اسم المعلم على الاستمارة</Text>
+            <TextInput
+              value={teacher}
+              onChangeText={(v) => { setTeacher(v); teacherEditedRef.current = true; }}
+              editable={!busy}
+              placeholder="اكتب اسم المعلم"
+              placeholderTextColor={p.text4}
+              style={st.teacherInput}
+              textAlign="right"
+            />
+            <Text style={st.teacherHint}>
+              يُطبع في كل أوراق هذه الطباعة. وإن تركته فارغاً يُستخدم اسم الحساب أو الاسم المحفوظ مع التقييم.
+            </Text>
+          </View>
+        </View>
+
         {/* اختيار الوضع */}
         <Segmented
           value={mode}
@@ -358,15 +487,38 @@ export default function PrintScreen() {
             </Section>
 
             {/* الجولة */}
-            <Section title="نطاق الطباعة">
+            <Section title="نطاق الطباعة" hint="اختر أي تقييم تطبع">
               <Segmented
-                value={round}
-                onChange={setRound}
+                value={pickMode}
+                onChange={setPickMode}
                 options={[
                   { value: 'all', label: 'كل التقييمات' },
-                  { value: 'latest', label: 'آخر تقييم فقط' },
+                  { value: 'specific', label: 'تقييم محدد' },
                 ]}
               />
+              {pickMode === 'specific' && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: sp.sm, paddingTop: sp.sm, flexDirection: 'row-reverse' }}
+                >
+                  <Pressable
+                    onPress={() => setPickValue('latest')}
+                    style={[st.chip, pickValue === 'latest' && st.chipActive]}
+                  >
+                    <Text style={[st.chipText, pickValue === 'latest' && st.chipTextActive]}>آخر تقييم</Text>
+                  </Pressable>
+                  {Array.from({ length: maxPick }, (_, i) => i + 1).map((n) => (
+                    <Pressable
+                      key={n}
+                      onPress={() => setPickValue(n)}
+                      style={[st.chip, pickValue === n && st.chipActive]}
+                    >
+                      <Text style={[st.chipText, pickValue === n && st.chipTextActive]}>تقييم {n}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
             </Section>
 
             {/* معاينة القائمة */}
@@ -436,7 +588,31 @@ function todayISO(): string {
 
 const st = StyleSheet.create({
   bg: { flex: 1, backgroundColor: p.bg },
-  scroll: { paddingHorizontal: sp.lg, paddingBottom: sp.huge, gap: sp.lg },
+  scroll: { ...contentColumn, paddingHorizontal: sp.lg, paddingBottom: sp.huge, gap: sp.lg },
+
+  teacherCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: sp.sm,
+    backgroundColor: p.bgAlt,
+    borderWidth: 1,
+    borderColor: p.line,
+    borderRadius: rad.md,
+    padding: sp.md,
+  },
+  teacherIcon: {
+    width: 32, height: 32, borderRadius: rad.sm,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: p.bgLift,
+  },
+  teacherLabel: { fontFamily: fnt.b, fontSize: fs.xs, color: p.text },
+  teacherInput: {
+    fontFamily: fnt.m, fontSize: fs.sm, color: p.text,
+    backgroundColor: p.bg,
+    borderWidth: 1, borderColor: p.line, borderRadius: rad.sm,
+    paddingHorizontal: sp.sm, paddingVertical: 8,
+  },
+  teacherHint: { fontFamily: fnt.r, fontSize: fs.xxs, color: p.text3, lineHeight: 15 },
 
   cardTitle: { fontFamily: fnt.b, fontSize: fs.md, color: p.text },
   cardHint: { fontFamily: fnt.r, fontSize: fs.xs, color: p.text3, marginTop: 2 },
@@ -490,4 +666,15 @@ const st = StyleSheet.create({
   listName: { fontFamily: fnt.m, fontSize: fs.sm, color: p.text },
   listMeta: { fontFamily: fnt.r, fontSize: fs.xxs, color: p.text3, marginTop: 1 },
   listScore: { fontFamily: fnt.bk, fontSize: fs.md },
+  chip: {
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
+    borderRadius: rad.pill,
+    backgroundColor: p.bgLift,
+    borderWidth: 1,
+    borderColor: p.line,
+  },
+  chipActive: { backgroundColor: p.primary, borderColor: p.primary },
+  chipText: { fontFamily: fnt.m, fontSize: fs.xs, color: p.text2 },
+  chipTextActive: { color: '#FFFFFF', fontFamily: fnt.b },
 });
