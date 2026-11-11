@@ -19,7 +19,7 @@ import { formWarnings } from '@/lib/warnings';
 import { confirmAction } from '@/lib/dialog';
 import { useSession } from '@/lib/session';
 import {
-  evaluationsForStudent, getDraft, saveDraft, saveEvaluation, deleteEvaluation,
+  evaluationsForStudent, getDraft, saveDraft, saveEvaluation, deleteEvaluation, scheduleAutoSync,
   clearDraftFor, listStudentsByGrade,
   type Evaluation, type Student,
 } from '@/lib/store';
@@ -358,6 +358,7 @@ export default function EvaluateScreen() {
       await clearDraftFor(studentId, kind, saved.evaluation_date);
       await loadHistory();
       setEditingId(null);
+      scheduleAutoSync();
 
       if (printAfter) {
         router.push({
@@ -401,6 +402,7 @@ const onSaveAndNext = async () => {
         teacher_name: teacherName,
       });
       await clearDraftFor(studentId, kind, saved.evaluation_date);
+      scheduleAutoSync();
       if (nextStudent) {
         navigateToStudent(nextStudent);
       } else {

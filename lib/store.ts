@@ -363,6 +363,7 @@ async function enqueue(item: Omit<QueueItem, 'id' | 'at' | 'tries'>): Promise<vo
   const q = await read<QueueItem[]>(K.syncQueue, []);
   q.push({ ...item, id: newId(), at: new Date().toISOString(), tries: 0 });
   await write(K.syncQueue, q);
+  scheduleAutoSync();
 }
 
 /* ------------------------------------------------------------------ */
@@ -961,10 +962,31 @@ export interface SyncResult {
   error?: string;
 }
 
+/* ------------------------------------------------------------------ */
+/*  مزامنة تلقائية (auto-sync)                                           */
+/* ------------------------------------------------------------------ */
+
+let autoSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
 /**
- * يرفع الطابور إلى السيرفر ثم يسحب أي تغييرات جديدة.
- * لا يفعل شيئاً إذا لم يكن هناك URL/Key في متغيرات البيئة.
+ * جدولة مزامنة تلقائية بعد تأخير (debounce).
+ * - لا تفعل شيئاً إذا كانت المزامنة معطّلة.
+ * - تمنع التكرار (debounce).
  */
+export function scheduleAutoSync(delayMs = 3000): void {
+  if (autoSyncTimer) clearTimeout(autoSyncTimer);
+  autoSyncTimer = setTimeout(async () => {
+    autoSyncTimer = null;
+    try {
+      const s = await getSettings();
+      if (!s.sync_enabled) return;
+      await sync();
+    } catch {
+      /* silent — المزامنة اليدوية («مزامنة الآن») تُظهر الخطأ */
+    }
+  }, delayMs);
+}
+
 export async function sync(): Promise<SyncResult> {
   const sb = initSupabase();
   if (!sb) {

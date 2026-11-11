@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, I18nManager } from 'react-native';
 import { c, fnt } from '@/constants/brand';
 import { useAppFonts } from '@/hooks/use-app-fonts';
+import { scheduleAutoSync } from '@/lib/store';
+import { useWebFocusRing } from '@/hooks/use-web-enhancements';
 import { SessionProvider } from '@/lib/session';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import {
@@ -118,6 +120,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   const { loaded } = useAppFonts();
+  useWebFocusRing();
+
+  useEffect(() => {
+    // مزامنة تلقائية: عند البداية (بعد 5s)، عند focus، وكل 5 دقائق
+    scheduleAutoSync(5000);
+    const onFocus = () => scheduleAutoSync(1000);
+    if (typeof window !== 'undefined') window.addEventListener('focus', onFocus);
+    const interval = setInterval(() => scheduleAutoSync(0), 5 * 60 * 1000);
+    return () => {
+      if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus);
+      clearInterval(interval);
+    };
+  }, []);
 
   if (!loaded) {
     return <View style={[styles.splash, { backgroundColor: c.bg }]} />;
