@@ -980,14 +980,31 @@ export async function sync(): Promise<SyncResult> {
     const queue = await read<QueueItem[]>(K.syncQueue, []);
     let pushed = 0;
 
+    // 1) رفع الطابور (التغييرات منذ آخر مزامنة)
     for (const item of queue) {
       const table = item.table;
       if (item.op === 'delete') {
-        const col = table === 'students' ? 'id' : 'id';
-        const { error } = await sb.from(table).delete().eq(col, item.rowId);
+        const { error } = await sb.from(table).delete().eq('id', item.rowId);
         if (!error) pushed++;
       } else {
         const { error } = await sb.from(table).upsert(item.payload as Record<string, unknown>);
+        if (!error) pushed++;
+      }
+    }
+
+    const localStudents = await read<Student[]>(K.students, []);
+    const localEvals = await read<Evaluation[]>(K.evaluations, []);
+
+    // 2) رفع ALL البيانات المحلية (فقط عند أول مزامنة — لضمان عدم فقدان بيانات أُنشئت قبل تفعيل المزامنة)
+    const isFirstSync = !settings.last_sync;
+    if (isFirstSync) {
+      for (const s of localStudents) {
+        const { error } = await sb.from('students').upsert(s as unknown as Record<string, unknown>);
+        if (!error) pushed++;
+      }
+      for (const e of localEvals) {
+        if (e.deleted) continue;
+        const { error } = await sb.from('evaluations').upsert(e as unknown as Record<string, unknown>);
         if (!error) pushed++;
       }
     }
@@ -997,9 +1014,6 @@ export async function sync(): Promise<SyncResult> {
     const { data: rEvals } = await sb.from('evaluations').select('*');
 
     // دمج السحوبات محلياً
-    const localStudents = await read<Student[]>(K.students, []);
-    const localEvals = await read<Evaluation[]>(K.evaluations, []);
-
     const sMap = new Map(localStudents.map((s) => [s.id, s]));
     for (const s of (rStudents as Student[]) ?? []) sMap.set(s.id, s);
 
