@@ -5,8 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { CRITERIA_BLOCKS } from '@/constants/criteria.data';
 import { APP, EVAL_KINDS, CRITERIA_COUNT } from '@/constants/criteria';
-import { c, sp, rad, fnt, fs, sh, BRAND } from '@/constants/brand';
-import { Button, Card, Badge, Section, BrandBar } from '@/components/pro-ui';
+import { BRAND_TONE, c, sp, rad, fnt, fs, sh, BRAND } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
+import { PageHero } from '@/components/page-hero';
+import { Button, Card, Badge, Section } from '@/components/pro-ui';
 import { TeachersPanel } from '@/components/TeachersPanel';
 import { useSession } from '@/lib/session';
 import { confirmAction } from '@/lib/dialog';
@@ -25,6 +27,7 @@ import {
   listEvaluations,
   type Settings,
 } from '@/lib/store';
+import { generateEvaluationsCSV, generateStudentsCSV, downloadOrShareFile } from '@/lib/export-excel';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -57,15 +60,63 @@ export default function SettingsScreen() {
 
 
   const onSync = async () => {
+    if (!ready) {
+      Alert.alert(
+        'المزامنة غير مهيّأة',
+        'التطبيق يعمل محلياً. لتفعيل المزامنة:\n' +
+          '1) أضف EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY إلى .env.local (محلي) أو Cloudflare (سحابي).\n' +
+          '2) أعد تشغيل التطبيق (أو hard refresh على الويب).\n' +
+          '3) ثم فعّل «المزامنة» وأعد المحاولة.'
+      );
+      return;
+    }
     setBusy(true);
     try {
       const r = await sync();
       if (r.ok) {
-        Alert.alert('تمت المزامنة', `تم رفع ${r.pushed} عنصر وتحديث البيانات.`);
+        const pullTotal = (r.pulled?.students ?? 0) + (r.pulled?.evaluations ?? 0);
+        Alert.alert(
+          'تمت المزامنة بنجاح',
+          `تم رفع ${r.pushed} تعديل إلى السحابة، وتحديث ${pullTotal} سجل من السيرفر.`
+        );
       } else {
-        Alert.alert('تعذرت المزامنة', r.error ?? 'خطأ غير معروف');
+        Alert.alert('تعذرت المزامنة', r.error ?? 'تأكد من الاتصال بالإنترنت وإعدادات السيرفر.');
       }
       await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onExportEvaluationsCSV = async () => {
+    setBusy(true);
+    try {
+      const { filename, csv, count } = await generateEvaluationsCSV();
+      if (count === 0) {
+        Alert.alert('تنبيه', 'لا توجد تقييمات مكتملة لتصديرها حالياً.');
+        return;
+      }
+      await downloadOrShareFile(filename, csv);
+      Alert.alert('تم التصدير', `تم تجهيز كشف التقييمات بنجاح (${count} تقييماً بصيغة Excel).`);
+    } catch (e) {
+      Alert.alert('خطأ', e instanceof Error ? e.message : 'تعذّر تصدير ملف Excel');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onExportStudentsCSV = async () => {
+    setBusy(true);
+    try {
+      const { filename, csv, count } = await generateStudentsCSV();
+      if (count === 0) {
+        Alert.alert('تنبيه', 'لا يوجد طلاب مسجلون حالياً.');
+        return;
+      }
+      await downloadOrShareFile(filename, csv);
+      Alert.alert('تم التصدير', `تم تجهيز كشف الطلاب بنجاح (${count} طالباً بصيغة Excel).`);
+    } catch (e) {
+      Alert.alert('خطأ', e instanceof Error ? e.message : 'تعذّر تصدير ملف Excel');
     } finally {
       setBusy(false);
     }
@@ -102,8 +153,15 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
-      <BrandBar title="الإعدادات" />
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <PageHero
+          tone={BRAND_TONE}
+          eyebrow="مساحة الإدارة"
+          title="الإعدادات"
+          sub="الحساب، وضع التعديل، البيانات، والطباعة"
+          compact
+        />
+
         {/* تحذير كلمة سر المشرف الافتراضية */}
         {adminPwIsDefault && (
           <Card padding={sp.md} style={{ borderColor: c.errLine, backgroundColor: c.errBg }}>
@@ -269,7 +327,7 @@ export default function SettingsScreen() {
                 <Text style={s.cardHint}>
                   {ready
                     ? 'البيانات تُرفع عند توفر الإنترنت'
-                    : 'التطبيق يعمل محلياً بالكامل بدون إنترنت'}
+                    : 'التطبيق يعمل محلياً بالكامل بدون إنترنت — أضف EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY إلى .env.local (محلي) أو Cloudflare (سحابي) لتفعيل المزامنة.'}
                 </Text>
               </View>
               <Badge
@@ -304,7 +362,6 @@ export default function SettingsScreen() {
               icon="sync-outline"
               onPress={onSync}
               loading={busy}
-              disabled={!ready}
               full
               style={{ marginTop: sp.md }}
             />
@@ -408,21 +465,38 @@ export default function SettingsScreen() {
           </Card>
         </Section>
 
-        {/* النسخ الاحتياطي */}
-        <Section title="النسخ الاحتياطي">
+        {/* النسخ الاحتياطي وتصدير البيانات */}
+        <Section title="النسخ الاحتياطي وتصدير Excel">
           <Card padding={sp.lg}>
             <Text style={s.cardHint}>
-              تُصدَّر البيانات كنص JSON يمكن حفظه أو إرساله.
+              تصدير كشوفات الرصد والطلاب بصيغة Excel (CSV) المتوافقة مع نظام نور، أو حفظ واستعادة نسخة احتياطية كاملة (JSON).
             </Text>
-            <Button
-              label="تصدير نسخة احتياطية"
-              variant="surface"
-              icon="download-outline"
-              onPress={onExport}
-              loading={busy}
-              full
-              style={{ marginTop: sp.md }}
-            />
+            <View style={{ gap: sp.sm, marginTop: sp.md }}>
+              <Button
+                label="تصدير كشف التقييمات إلى Excel (CSV)"
+                variant="surface"
+                icon="document-text-outline"
+                onPress={onExportEvaluationsCSV}
+                loading={busy}
+                full
+              />
+              <Button
+                label="تصدير كشف بأسماء الطلاب (CSV)"
+                variant="surface"
+                icon="people-outline"
+                onPress={onExportStudentsCSV}
+                loading={busy}
+                full
+              />
+              <Button
+                label="تصدير نسخة احتياطية كاملة (JSON)"
+                variant="ghost"
+                icon="download-outline"
+                onPress={onExport}
+                loading={busy}
+                full
+              />
+            </View>
           </Card>
         </Section>
 
@@ -514,7 +588,7 @@ function Line({
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
-  scroll: { paddingHorizontal: sp.lg, paddingBottom: sp.huge, gap: sp.xl },
+  scroll: { ...contentColumn, paddingHorizontal: sp.lg, paddingBottom: sp.huge, gap: sp.xl },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
   rowIcon: {
