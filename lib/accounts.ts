@@ -46,6 +46,16 @@ export interface Account {
   /** المقررات المسندة — المعلم لا يرى غيرها. المشرف يتجاوز هذا الحد. */
   subjectIds: SubjectId[];
   createdAt: string;
+  /**
+   * آخر تعديل — تعتمد عليه المزامنة: الأحدث يفوز عند التعارض بين الأجهزة.
+   * الحسابات القديمة قد لا تحمله، فتُعامل بـ `createdAt`.
+   */
+  updatedAt?: string;
+  /**
+   * علامة حذف — لا نحذف الصف من الملف حتى يُحذف من السحابة أيضاً،
+   * وإلا عاد من جهاز آخر في المزامنة التالية.
+   */
+  deleted?: boolean;
 }
 
 interface AccountsFile {
@@ -162,17 +172,22 @@ async function load(): Promise<AccountsFile> {
 /* ------------------------------------------------------------------ */
 
 export async function listAccounts(): Promise<Account[]> {
+  return (await load()).accounts.filter((a) => !a.deleted);
+}
+
+/** كل الحسابات بما فيها المحذوفة (علامة حذف) — للمزامنة فقط */
+export async function allAccountsIncludingDeleted(): Promise<Account[]> {
   return (await load()).accounts;
 }
 
 /** هل يوجد حساب مشرف؟ — زرعُه يضمن وجوده دائماً */
 export async function hasAdmin(): Promise<boolean> {
-  return (await load()).accounts.some((a) => a.role === 'admin');
+  return (await load()).accounts.some((a) => a.role === 'admin' && !a.deleted);
 }
 
 export async function getAccountByUsername(username: string): Promise<Account | null> {
   const u = normalizeUsername(username);
-  return (await load()).accounts.find((a) => a.username === u) ?? null;
+  return (await load()).accounts.find((a) => a.username === u && !a.deleted) ?? null;
 }
 
 export function normalizeUsername(u: string): string {
@@ -185,7 +200,7 @@ export function normalizeUsername(u: string): string {
  */
 export async function isAdminPasswordDefault(): Promise<boolean> {
   const f = await load();
-  const admins = f.accounts.filter((a) => a.role === 'admin');
+  const admins = f.accounts.filter((a) => a.role === 'admin' && !a.deleted);
   if (!admins.length) return false;
   const def = hashPassword(DEFAULT_ADMIN.password);
   return admins.every((a) => a.pwHash === def);
@@ -211,7 +226,7 @@ export function visibleSubjects(
 function validateUsername(f: AccountsFile, username: string, exceptId?: string): string | null {
   if (!username) return 'اسم المستخدم مطلوب.';
   if (username.length < 3) return 'اسم المستخدم قصير جداً (٣ أحرف على الأقل).';
-  if (f.accounts.some((a) => a.username === username && a.id !== exceptId)) {
+  if (f.accounts.some((a) => a.username === username && a.id !== exceptId && !a.deleted)) {
     return 'اسم المستخدم «' + username + '» مستخدم بالفعل.';
   }
   return null;
@@ -232,7 +247,7 @@ export async function addAccount(input: {
   const bad = validateUsername(f, username);
   if (bad) return { ok: false, error: bad };
   if (!name) return { ok: false, error: 'الاسم الظاهر مطلوب.' };
-  if (input.role === 'admin' && !f.accounts.some((a) => a.role === 'admin')) {
+  if (input.role === 'admin' && !f.accounts.some((a) => a.role === 'admin' && !a.deleted)) {
     return { ok: false, error: 'يجب إنشاء حساب مشرف أولاً.' };
   }
   if (!input.password) return { ok: false, error: 'كلمة سر الحساب مطلوبة.' };
@@ -248,6 +263,7 @@ export async function addAccount(input: {
     pwHash: hashPassword(input.password),
     subjectIds: input.subjectIds ?? [],
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   });
   await save(f);
   return { ok: true };
@@ -275,12 +291,12 @@ export async function updateAccount(
   // لا نترك التطبيق بلا مشرف إطلاقاً
   if (patch.role === 'teacher') {
     const a = f.accounts[i];
-    if (a.role === 'admin' && !f.accounts.some((x) => x.id !== id && x.role === 'admin')) {
+    if (a.role === 'admin' && !f.accounts.some((x) => x.id !== id && x.role === 'admin' && !x.deleted)) {
       return { ok: false, error: 'لا يمكن أن يبقى التطبيق بلا حساب مشرف.' };
     }
   }
 
-  f.accounts[i] = { ...f.accounts[i], ...next };
+  f.accounts[i] = { ...f.accounts[i], ...next, updatedAt: new Date().toISOString() };
   await save(f);
   return { ok: true };
 }
@@ -289,12 +305,74 @@ export async function deleteAccount(id: string): Promise<{ ok: boolean; error?: 
   const f = await load();
   const i = f.accounts.findIndex((a) => a.id === id);
   if (i < 0) return { ok: false, error: 'الحساب غير موجود.' };
-  if (f.accounts[i].role === 'admin' && !f.accounts.some((a) => a.id !== id && a.role === 'admin')) {
+  if (f.accounts[i].role === 'admin' && !f.accounts.some((a) => a.id !== id && a.role === 'admin' && !a.deleted)) {
     return { ok: false, error: 'لا يمكن حذف آخر حساب مشرف.' };
   }
-  f.accounts.splice(i, 1);
+  // علامة حذف لا حذفاً حقيقياً — حتى ينتقل الحذف إلى الأجهزة الأخرى
+  f.accounts[i] = { ...f.accounts[i], deleted: true, enabled: false, updatedAt: new Date().toISOString() };
   await save(f);
   return { ok: true };
+}
+
+/**
+ * دمج الحسابات القادمة من السحابة.
+ * القاعدة: الأحدث (`updatedAt`) يفوز، والحذف يُعامل كتعديل عادي.
+ * لا نترك التطبيق بلا حساب مشرف مهما حدث.
+ */
+export async function mergeAccountsFromRemote(remote: Account[]): Promise<number> {
+  const f = await load();
+  const byId = new Map<string, Account>(f.accounts.map((a) => [a.id, a]));
+  const byUsername = new Map<string, Account>(
+    f.accounts.filter((a) => !a.deleted).map((a) => [a.username, a])
+  );
+  const stamp = (a: Account): string => a.updatedAt || a.createdAt || '';
+  let changed = 0;
+
+  const normalize = (r: Account): Account => ({
+    id: r.id,
+    username: normalizeUsername(String(r.username)),
+    name: r.name || r.username,
+    role: r.role === 'admin' ? 'admin' : 'teacher',
+    enabled: r.enabled !== false,
+    pwHash: r.pwHash || '',
+    subjectIds: Array.isArray(r.subjectIds) ? r.subjectIds : [],
+    createdAt: r.createdAt || new Date().toISOString(),
+    updatedAt: r.updatedAt || r.createdAt || new Date().toISOString(),
+    deleted: r.deleted === true,
+  });
+
+  for (const raw of remote) {
+    if (!raw?.id || !raw.username) continue;
+    const r = normalize(raw);
+
+    /**
+     * نفس اسم الدخول بمعرّف مختلف = الجهاز أنشأ حساباً مستقلاً
+     * (مثل المشرف المزروع آلياً عند أول تشغيل). نعتبرهما حساباً واحداً
+     * ونُبقي المعرّف المحلي، وإلا تكرّر اسم الدخول في كل جهاز.
+     */
+    const local = byId.get(r.id) ?? byUsername.get(r.username);
+    if (local && stamp(r) <= stamp(local)) continue;
+
+    const targetId = local?.id ?? r.id;
+    byId.set(targetId, { ...r, id: targetId });
+    if (local) byUsername.delete(local.username);
+    if (!r.deleted) byUsername.set(r.username, { ...r, id: targetId });
+    changed++;
+  }
+
+  if (!changed) return 0;
+
+  let accounts = [...byId.values()];
+  if (!accounts.some((a) => a.role === 'admin' && !a.deleted)) {
+    for (const a of f.accounts.filter((x) => x.role === 'admin' && !x.deleted)) {
+      const i = accounts.findIndex((x) => x.id === a.id);
+      if (i >= 0) accounts[i] = { ...accounts[i], deleted: false, enabled: true };
+      else accounts.push(a);
+    }
+  }
+
+  await save({ ...f, accounts });
+  return changed;
 }
 
 /* ------------------------------------------------------------------ */
@@ -330,11 +408,15 @@ export async function setAccountPassword(
   if (bad) return { ok: false, error: bad };
 
   a.pwHash = hashPassword(password);
+  a.updatedAt = new Date().toISOString();
   // كلمة سر المشرف خ人人都يتها تاريخياً — نبقيها متزامنة
   if (a.role === 'admin') {
     f.adminPwHash = a.pwHash;
     f.accounts.forEach((x) => {
-      if (x.role === 'admin' && x.id !== id) x.pwHash = a.pwHash;
+      if (x.role === 'admin' && x.id !== id) {
+        x.pwHash = a.pwHash;
+        x.updatedAt = new Date().toISOString();
+      }
     });
   }
   await save(f);
@@ -354,7 +436,8 @@ export async function setRolePassword(
   if (bad) return { ok: false, error: bad };
 
   const h = hashPassword(password);
-  targets.forEach((a) => { a.pwHash = h; });
+  const now = new Date().toISOString();
+  targets.forEach((a) => { a.pwHash = h; a.updatedAt = now; });
   if (role === 'admin') f.adminPwHash = h;
   else f.teacherPwHash = h;
 
@@ -390,7 +473,7 @@ export async function authenticate(
   const u = normalizeUsername(username);
   if (!u) return { ok: false, reason: 'not-found' };
 
-  const acc = f.accounts.find((a) => a.username === u);
+  const acc = f.accounts.find((a) => a.username === u && !a.deleted);
   if (!acc) return { ok: false, reason: 'not-found' };
   if (!acc.enabled) return { ok: false, reason: 'disabled' };
 
@@ -438,7 +521,7 @@ export async function readSession(): Promise<SessionData | null> {
 
     const acc = (await load()).accounts.find((a) => a.id === s.accountId);
     // إن حُذف الحساب أو عُطّل بعد تسجيل الدخول نُنهي الجلسة
-    if (!acc || !acc.enabled) {
+    if (!acc || !acc.enabled || acc.deleted) {
       await AsyncStorage.removeItem(K_SESSION);
       return null;
     }

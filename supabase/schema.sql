@@ -64,22 +64,48 @@ create index if not exists evaluations_date_idx
   on public.evaluations (evaluation_date desc);
 
 -- ---------------------------------------------------------------------
+--  جدول الحسابات (المشرف والمعلمون)
+--  يُزامَن حتى يستطيع المعلم الدخول من أي جهاز، لا من جهاز إنشائه فقط.
+--  تُخزَّن كلمة السر مجزّأة (SHA-256 بملح ثابت) ولا تُخزَّن نصّية أبداً.
+-- ---------------------------------------------------------------------
+create table if not exists public.accounts (
+  id          text primary key,
+  username    text        not null,
+  name        text        not null,
+  role        text        not null check (role in ('admin','teacher')),
+  enabled     boolean     not null default true,
+  pw_hash     text        not null default '',
+  subject_ids jsonb       not null default '[]'::jsonb,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  deleted     boolean     not null default false
+);
+
+create index if not exists accounts_username_idx
+  on public.accounts (lower(username));
+
+-- ---------------------------------------------------------------------
 --  صلاحيات الصفوف (Row Level Security)
 --  الإعداد الافتراضي: قراءة للجميع، والكتابة تتطلب مفتاح صالح.
 --  إن أردت قفلاً أضيق، فعّل المصادقة (auth) ثم عدّل السياسات.
 -- ---------------------------------------------------------------------
 alter table public.students    enable row level security;
 alter table public.evaluations enable row level security;
+alter table public.accounts    enable row level security;
 
 drop policy if exists "students read"   on public.students;
 drop policy if exists "students write"  on public.students;
 drop policy if exists "evaluations read"  on public.evaluations;
 drop policy if exists "evaluations write" on public.evaluations;
+drop policy if exists "accounts read"   on public.accounts;
+drop policy if exists "accounts write"  on public.accounts;
 
 create policy "students read"   on public.students    for select using (true);
 create policy "students write"  on public.students    for all using (true) with check (true);
 create policy "evaluations read"  on public.evaluations for select using (true);
 create policy "evaluations write" on public.evaluations for all using (true) with check (true);
+create policy "accounts read"   on public.accounts    for select using (true);
+create policy "accounts write"  on public.accounts    for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------
 --  دالة مساعدة: تحديث updated_at تلقائياً

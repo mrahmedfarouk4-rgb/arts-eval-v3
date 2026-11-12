@@ -10,6 +10,7 @@ import {
   type Account, type Role,
 } from '@/lib/accounts';
 import { SUBJECTS, subjectName, type SubjectId } from '@/constants/criteria';
+import { scheduleAutoSync } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 
 const ALL_SUBJECTS = SUBJECTS.map((x) => x.id) as SubjectId[];
@@ -74,6 +75,7 @@ export function TeachersPanel({ onChanged }: { onChanged?: () => void }) {
             if (!r.ok) return Alert.alert('تعذّرت الإضافة', r.error);
             setAdding(false);
             await reload();
+            scheduleAutoSync(1200);
           }}
         />
       ) : editing ? (
@@ -86,12 +88,14 @@ export function TeachersPanel({ onChanged }: { onChanged?: () => void }) {
             if (!r.ok) return Alert.alert('تعذّر التعديل', r.error);
             setEditing(null);
             await reload();
+            scheduleAutoSync(1200);
           }}
           onSetPassword={async (pw) => {
             const r = await setAccountPassword(editing.id, pw);
             if (!r.ok) return Alert.alert('تعذّر تغيير كلمة السر', r.error);
             Alert.alert('تم', `كلمة سر «${editing.name}» حُدِّثت.`);
             await reload();
+            scheduleAutoSync(1200);
           }}
           onDelete={async () => {
             const ok = await confirmAction(
@@ -104,6 +108,7 @@ export function TeachersPanel({ onChanged }: { onChanged?: () => void }) {
             if (!r.ok) return Alert.alert('تعذّر الحذف', r.error);
             setEditing(null);
             await reload();
+            scheduleAutoSync(1200);
           }}
         />
       ) : (

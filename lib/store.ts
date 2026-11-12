@@ -18,8 +18,12 @@ import {
   SIX_WEEK_STORAGE_KEY, SIX_WEEK_DRAFT_KEY,
   listSixWeekReports, mergeSixWeekReports, type SixWeekReport,
 } from '@/lib/six-week';
-import { readSession } from '@/lib/accounts';
-
+import {
+  readSession,
+  allAccountsIncludingDeleted,
+  mergeAccountsFromRemote,
+  type Account,
+} from '@/lib/accounts';
 /* ------------------------------------------------------------------ */
 /*  الأنواع                                                             */
 /* ------------------------------------------------------------------ */
@@ -994,6 +998,10 @@ const EVALUATION_COLUMNS = [
   'evaluation_date', 'label', 'scores', 'teacher_name', 'updated_at', 'deleted',
   'planned', 'unit',
 ];
+const ACCOUNT_COLUMNS = [
+  'id', 'username', 'name', 'role', 'enabled', 'pw_hash', 'subject_ids',
+  'created_at', 'updated_at', 'deleted',
+];
 
 /** يبقي الحقول المعروفة فقط ويحوّل القيم الفارغة إلى ما يقبله الجدول */
 function studentRow(s: Student): Record<string, unknown> {
@@ -1036,14 +1044,49 @@ function pick(row: Record<string, unknown>, cols: string[]): Record<string, unkn
   return out;
 }
 
-export async function sync(): Promise<SyncResult> {
+/** صف الحساب كما يُخزَّن في جدول accounts */
+function accountRow(a: Account): Record<string, unknown> {
+  return pick(
+    {
+      id: a.id,
+      username: a.username,
+      name: a.name,
+      role: a.role,
+      enabled: a.enabled ?? true,
+      pw_hash: a.pwHash ?? '',
+      subject_ids: a.subjectIds ?? [],
+      created_at: a.createdAt || new Date().toISOString(),
+      updated_at: a.updatedAt || a.createdAt || new Date().toISOString(),
+      deleted: a.deleted === true,
+    },
+    ACCOUNT_COLUMNS
+  );
+}
+
+/** عكس `accountRow` — صف من السحابة إلى حساب محلي */
+function accountFromRow(r: Record<string, unknown>): Account {
+  return {
+    id: String(r.id ?? ''),
+    username: String(r.username ?? ''),
+    name: String(r.name ?? r.username ?? ''),
+    role: r.role === 'admin' ? 'admin' : 'teacher',
+    enabled: r.enabled !== false,
+    pwHash: String(r.pw_hash ?? ''),
+    subjectIds: Array.isArray(r.subject_ids) ? (r.subject_ids as Account['subjectIds']) : [],
+    createdAt: String(r.created_at ?? new Date().toISOString()),
+    updatedAt: r.updated_at ? String(r.updated_at) : undefined,
+    deleted: r.deleted === true,
+  };
+}
+
+export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> {
   const sb = initSupabase();
   if (!sb) {
     return { ok: false, pushed: 0, pulled: { students: 0, evaluations: 0 }, error: 'المزامنة غير مهيّأة' };
   }
 
   const settings = await getSettings();
-  if (!settings.sync_enabled) {
+  if (!settings.sync_enabled && !opts.force) {
     return { ok: false, pushed: 0, pulled: { students: 0, evaluations: 0 }, error: 'المزامنة معطّلة' };
   }
 
@@ -1092,9 +1135,23 @@ export async function sync(): Promise<SyncResult> {
       }
     }
 
+    // 3) الحسابات — قليلة العدد، تُرفع في كل مزامنة حتى تصل إلى بقية الأجهزة
+    const localAccounts = await allAccountsIncludingDeleted();
+    for (const a of localAccounts) {
+      const { error } = await sb.from('accounts').upsert(accountRow(a));
+      if (error) failures.push(`accounts: ${error.message}`);
+      else pushed++;
+    }
+
     // السحب
     const { data: rStudents } = await sb.from('students').select('*');
     const { data: rEvals } = await sb.from('evaluations').select('*');
+    const { data: rAccounts } = await sb.from('accounts').select('*');
+
+    // الحسابات: دمج بالأحدث — ينتقل الحذف وتغيير كلمة السر بين الأجهزة
+    await mergeAccountsFromRemote(
+      ((rAccounts ?? []) as Record<string, unknown>[]).map(accountFromRow)
+    );
 
     // دمج السحوبات محلياً
     const sMap = new Map(localStudents.map((s) => [s.id, s]));
@@ -1162,6 +1219,12 @@ export async function uploadAll(): Promise<SyncResult> {
     for (const e of evals) {
       const { error } = await sb.from('evaluations').upsert(toRow('evaluations', e));
       if (error) failures.push(`evaluations: ${error.message}`);
+      else pushed++;
+    }
+
+    for (const a of await allAccountsIncludingDeleted()) {
+      const { error } = await sb.from('accounts').upsert(accountRow(a));
+      if (error) failures.push(`accounts: ${error.message}`);
       else pushed++;
     }
 

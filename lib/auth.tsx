@@ -14,6 +14,7 @@ import {
   authenticate, clearSession, isAdminPasswordDefault, persistSession, readSession,
   type AuthFailure, type Role,
 } from '@/lib/accounts';
+import { sync } from '@/lib/store';
 import type { SubjectId } from '@/constants/criteria';
 
 // مُعاد التصدير: الجلسة تحتاج قراءة الحساب المحفوظ لتملأ «اسم المعلم»
@@ -79,7 +80,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const r = await authenticate(username, password);
+    let r = await authenticate(username, password);
+
+    /**
+     * الحساب قد يكون أُنشئ على جهاز آخر ولم يصل بعد إلى هذا الجهاز.
+     * قبل أن نخبر المعلم «اسم المستخدم غير موجود» نسحب الحسابات مرة واحدة
+     * ثم نعيد المحاولة — فلا يحتاج إلى مزامنة يدوية قبل الدخول.
+     */
+    if (!r.ok && (r.reason === 'not-found' || r.reason === 'not-configured')) {
+      try {
+        // force: قد تكون المزامنة معطّلة على جهاز جديد — نريد سحب الحسابات فقط
+        await sync({ force: true });
+      } catch {
+        /* بلا اتصال: نكمل برسالة الفشل الأصلية */
+      }
+      r = await authenticate(username, password);
+    }
+
     if (!r.ok) return { ok: false, reason: r.reason };
     const u: AuthUser = {
       accountId: r.account.id,
