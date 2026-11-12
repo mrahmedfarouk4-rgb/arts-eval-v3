@@ -97,6 +97,12 @@ export function TeachersPanel({ onChanged }: { onChanged?: () => void }) {
           onSave={async (v) => {
             const r = await updateAccount(editing.id, v);
             if (!r.ok) return Alert.alert('تعذّر التعديل', r.error);
+            // كلمة سر مكتوبة في النموذج تُغيَّر مع الحفظ — حتى لا يظنّ المشرف
+            // أنها حُفظت لمجرّد الضغط على «حفظ»
+            if (v.password) {
+              const p = await setAccountPassword(editing.id, v.password);
+              if (!p.ok) return Alert.alert('تعذّر تغيير كلمة السر', p.error);
+            }
             setEditing(null);
             await reload();
             scheduleAutoSync(1200);
@@ -267,8 +273,8 @@ function AccountForm({
       subjectIds: subjects,
       gradeIds: grades,
       ...(initial ? { enabled } : {}),
-      // الحساب الجديد يأخذ كلمته عند الإنشاء؛ والتعديل له زر منفصل
-      ...(initial ? {} : { password: pw }),
+      // كلمة السر تُحفظ مع النموذج: عند الإنشاء، وعند التعديل أيضاً إن كُتبت
+      ...(pw ? { password: pw } : {}),
     });
 
   return (
@@ -376,8 +382,10 @@ function AccountForm({
       <Text style={[s.fieldLabel, { marginTop: sp.md }]}>
         كلمة السر {initial ? '' : '(للمعلم — يستعملها للدخول)'}
       </Text>
-      {initial && !onSetPassword && (
-        <Text style={s.hint}>اضغط زر «تغيير كلمة السر» أدناه.</Text>
+      {initial && (
+        <Text style={s.hint}>
+          اكتب كلمة السر الجديدة هنا لتُغيَّر مع «حفظ»، أو استعمل زر «تغيير كلمة السر» أدناه.
+        </Text>
       )}
       <View style={s.pwGrid}>
         <TextInput

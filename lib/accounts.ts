@@ -59,6 +59,15 @@ export interface Account {
    */
   updatedAt?: string;
   /**
+   * آخر تغيير لكلمة السر وحدها.
+   * ------------------------------------------------------------------
+   * الاعتماد على `updatedAt` وحده يجعل تغيير كلمة السر يضيع إن عدّل
+   * جهاز آخر مقررات الحساب نفسه في وقت أحدث (الصف كله لجهاز واحد).
+   * فصار لكلمة السر ختمها الخاص: تُطبَّق من الجهاز الذي غيّرها آخر مرة
+   * مهما كان ترتيب تعديلات الحقول الأخرى.
+   */
+  pwUpdatedAt?: string;
+  /**
    * حساب مُزرَع محلياً عند أول تشغيل (المشرف الافتراضي).
    * لا يُرفع إلى السحابة ولا يطمس حساباً حقيقياً بنفس اسم الدخول.
    */
@@ -382,6 +391,7 @@ export async function mergeAccountsFromRemote(remote: Account[]): Promise<number
     gradeIds: Array.isArray(r.gradeIds) ? r.gradeIds : [],
     createdAt: r.createdAt || new Date().toISOString(),
     updatedAt: r.updatedAt || r.createdAt || new Date().toISOString(),
+    pwUpdatedAt: r.pwUpdatedAt || undefined,
     seeded: false,
     deleted: r.deleted === true,
   });
@@ -398,12 +408,48 @@ export async function mergeAccountsFromRemote(remote: Account[]): Promise<number
     const local = byId.get(r.id) ?? byUsername.get(r.username);
     // الحساب المزروع لا يغلب الحساب الحقيقي مهما كان التاريخ
     const forced = !!local?.seeded && !r.deleted;
-    if (local && !forced && stamp(r) <= stamp(local)) continue;
 
-    const targetId = local?.id ?? r.id;
-    byId.set(targetId, { ...r, id: targetId });
-    if (local) byUsername.delete(local.username);
-    if (!r.deleted) byUsername.set(r.username, { ...r, id: targetId });
+    const rowWins = !!local && !forced && stamp(r) > stamp(local);
+    /**
+     * كلمة السر تُقارَن بختمها الخاص لا بختم الصف:
+     * جهاز قد يعدّل المقررات (فيصير صفّه أحدث) بينما غيّر جهاز آخر
+     * كلمة السر قبله بقليل — بدون هذا السطر تعود كلمة السر القديمة.
+     */
+    const pwWins =
+      !!local &&
+      !forced &&
+      !local.deleted &&
+      (r.pwUpdatedAt || '') > (local.pwUpdatedAt || '');
+
+    if (!local) {
+      byId.set(r.id, r);
+      if (!r.deleted) byUsername.set(r.username, r);
+      changed++;
+      continue;
+    }
+
+    if (!rowWins && !pwWins) continue;
+
+    const targetId = local.id;
+    const merged: Account = rowWins ? { ...r, id: targetId } : { ...local };
+    /**
+     * كلمة السر تتبع ختمها هي دائماً، في الاتجاهين:
+     * قد يفوز صفّ السحابة بتعديلات أحدث للمقررات بينما كلمة السر
+     * المحلية أحدث — فنُبقي كلمة السر المحلية ونرفعها.
+     */
+    const localPwNewer = (local.pwUpdatedAt || '') > (r.pwUpdatedAt || '');
+    if (rowWins) {
+      if (localPwNewer) {
+        merged.pwHash = local.pwHash;
+        merged.pwUpdatedAt = local.pwUpdatedAt;
+      }
+    } else if (pwWins) {
+      merged.pwHash = r.pwHash;
+      merged.pwUpdatedAt = r.pwUpdatedAt;
+    }
+    byId.set(targetId, merged);
+    byUsername.delete(local.username);
+    if (!merged.deleted) byUsername.set(merged.username, merged);
     changed++;
   }
 
@@ -454,17 +500,20 @@ export async function setAccountPassword(
   const bad = weakPassword(password, a.username);
   if (bad) return { ok: false, error: bad };
 
+  const changedAt = new Date().toISOString();
   a.pwHash = hashPassword(password);
   a.seeded = false;
-  a.updatedAt = new Date().toISOString();
-  // كلمة سر المشرف خ人人都يتها تاريخياً — نبقيها متزامنة
+  a.updatedAt = changedAt;
+  a.pwUpdatedAt = changedAt;
+  // كلمة سر المشرف تاريخياً موحّدة — نبقيها متزامنة
   if (a.role === 'admin') {
     f.adminPwHash = a.pwHash;
     f.accounts.forEach((x) => {
       if (x.role === 'admin' && x.id !== id) {
         x.pwHash = a.pwHash;
         x.seeded = false;
-        x.updatedAt = new Date().toISOString();
+        x.updatedAt = changedAt;
+        x.pwUpdatedAt = changedAt;
       }
     });
   }
@@ -486,7 +535,7 @@ export async function setRolePassword(
 
   const h = hashPassword(password);
   const now = new Date().toISOString();
-  targets.forEach((a) => { a.pwHash = h; a.seeded = false; a.updatedAt = now; });
+  targets.forEach((a) => { a.pwHash = h; a.seeded = false; a.updatedAt = now; a.pwUpdatedAt = now; });
   if (role === 'admin') f.adminPwHash = h;
   else f.teacherPwHash = h;
 

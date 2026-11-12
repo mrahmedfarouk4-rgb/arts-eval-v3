@@ -999,7 +999,7 @@ const EVALUATION_COLUMNS = [
 ];
 const ACCOUNT_COLUMNS = [
   'id', 'username', 'name', 'role', 'enabled', 'pw_hash', 'subject_ids', 'grade_ids',
-  'created_at', 'updated_at', 'deleted',
+  'created_at', 'updated_at', 'deleted', 'pw_updated_at',
 ];
 
 /** يبقي الحقول المعروفة فقط ويحوّل القيم الفارغة إلى ما يقبله الجدول */
@@ -1064,6 +1064,8 @@ function accountRow(a: Account): Record<string, unknown> {
       grade_ids: a.gradeIds ?? [],
       created_at: a.createdAt || new Date().toISOString(),
       updated_at: a.updatedAt || a.createdAt || new Date().toISOString(),
+      // ختم تغيير كلمة السر — للحسابات القديمة نستخدم آخر تعديل معروف
+      pw_updated_at: a.pwUpdatedAt || a.updatedAt || a.createdAt || new Date().toISOString(),
       deleted: a.deleted === true,
     },
     ACCOUNT_COLUMNS
@@ -1083,6 +1085,7 @@ function accountFromRow(r: Record<string, unknown>): Account {
     gradeIds: Array.isArray(r.grade_ids) ? (r.grade_ids as Account['gradeIds']) : [],
     createdAt: String(r.created_at ?? new Date().toISOString()),
     updatedAt: r.updated_at ? String(r.updated_at) : undefined,
+    pwUpdatedAt: r.pw_updated_at ? String(r.pw_updated_at) : undefined,
     deleted: r.deleted === true,
   };
 }

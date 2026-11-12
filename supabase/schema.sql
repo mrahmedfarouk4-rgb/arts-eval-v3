@@ -79,6 +79,9 @@ create table if not exists public.accounts (
   grade_ids   jsonb       not null default '[]'::jsonb,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
+  -- ختم تغيير كلمة السر وحده — كي لا يُلغي تعديلُ المقررات من جهاز
+  -- تغييرَ كلمة السر من جهاز آخر (الأحدث في كل حقل يفوز)
+  pw_updated_at timestamptz not null default '1970-01-01 00:00:00+00',
   deleted     boolean     not null default false
 );
 
