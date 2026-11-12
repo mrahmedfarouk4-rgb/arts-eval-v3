@@ -1187,24 +1187,23 @@ export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> 
     const localStudents = await read<Student[]>(K.students, []);
     const localEvals = await read<Evaluation[]>(K.evaluations, []);
 
-    // 2) رفع ALL البيانات المحلية (فقط عند أول مزامنة — لضمان عدم فقدان بيانات أُنشئت قبل تفعيل المزامنة)
-    const isFirstSync = !settings.last_sync;
-    if (isFirstSync) {
-      for (const group of chunk(localStudents, 100)) {
-        const { error } = await sb.from('students').upsert(group.map((s) => toRow('students', s)));
-        if (error) failures.push(`students: ${error.message}`);
-        else pushed += group.length;
-      }
-      const alive = localEvals.filter((e) => !e.deleted);
-      for (const group of chunk(alive, 100)) {
-        const { error } = await sb.from('evaluations').upsert(group.map((e) => toRow('evaluations', e)));
-        if (error) failures.push(`evaluations: ${error.message}`);
-        else pushed += group.length;
-      }
-    }
+    /**
+     * 2) السحب أولاً ثم الرفع — الترتيب مقصود ومهم:
+     *    كان الرفع يسبق السحب، فأي جهاز فيه نسخة قديمة يكتبها فوق تعديلات
+     *    أحدث أجراها جهاز آخر (ضاعت إسنادات المقررات والمراحل بهذا السبب).
+     *    الآن نسحب، ندمج بقاعدة «الأحدث يفوز»، ثم نرفع النسخة المدمجة —
+     *    فلا يستطيع جهاز متأخر أن يمحو عمل جهاز آخر.
+     */
+    const { data: rStudents } = await sb.from('students').select('*');
+    const { data: rEvals } = await sb.from('evaluations').select('*');
+    const { data: rAccounts } = await sb.from('accounts').select('*');
 
-    // 3) الحسابات — قليلة العدد، تُرفع في كل مزامنة حتى تصل إلى بقية الأجهزة
-    //    (نتجاهل الحساب المزروع محلياً بكلمة السر الافتراضية: لا يُشارَك أبداً)
+    // الحسابات: دمج بالأحدث — ينتقل الحذف وكلمة السر والمقررات والمراحل
+    await mergeAccountsFromRemote(
+      ((rAccounts ?? []) as Record<string, unknown>[]).map(accountFromRow)
+    );
+
+    // 3) رفع الحسابات بعد الدمج (يُستثنى المشرف المزروع محلياً بكلمة سره المعروفة)
     const localAccounts = (await allAccountsIncludingDeleted()).filter((a) => !a.seeded);
     for (const a of localAccounts) {
       const { error } = await sb.from('accounts').upsert(accountRow(a));
@@ -1213,15 +1212,27 @@ export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> 
     }
     await pruneDuplicateAccounts(sb, localAccounts);
 
-    // السحب
-    const { data: rStudents } = await sb.from('students').select('*');
-    const { data: rEvals } = await sb.from('evaluations').select('*');
-    const { data: rAccounts } = await sb.from('accounts').select('*');
-
-    // الحسابات: دمج بالأحدث — ينتقل الحذف وتغيير كلمة السر بين الأجهزة
-    await mergeAccountsFromRemote(
-      ((rAccounts ?? []) as Record<string, unknown>[]).map(accountFromRow)
-    );
+    /*
+     * أول مزامنة على هذا الجهاز: نرفع فقط ما لا وجود له في السحابة.
+     * لا نكتب فوق صفّ موجود أصلاً حتى لو كانت نسختنا المحلية أقدم —
+     * بياناته قد تكون أحدث من جهاز آخر.
+     */
+    if (!settings.last_sync) {
+      const remoteStudentIds = new Set(((rStudents ?? []) as Student[]).map((s) => s.id));
+      const newStudents = localStudents.filter((s) => !remoteStudentIds.has(s.id));
+      for (const group of chunk(newStudents, 100)) {
+        const { error } = await sb.from('students').upsert(group.map((s) => toRow('students', s)));
+        if (error) failures.push(`students: ${error.message}`);
+        else pushed += group.length;
+      }
+      const remoteEvalIds = new Set(((rEvals ?? []) as Evaluation[]).map((e) => e.id));
+      const newEvals = localEvals.filter((e) => !e.deleted && !remoteEvalIds.has(e.id));
+      for (const group of chunk(newEvals, 100)) {
+        const { error } = await sb.from('evaluations').upsert(group.map((e) => toRow('evaluations', e)));
+        if (error) failures.push(`evaluations: ${error.message}`);
+        else pushed += group.length;
+      }
+    }
 
     // دمج السحوبات محلياً
     const sMap = new Map(localStudents.map((s) => [s.id, s]));
@@ -1292,14 +1303,11 @@ export async function uploadAll(): Promise<SyncResult> {
       else pushed += group.length;
     }
 
-    // الحسابات المزروعة محلياً (المشرف الافتراضي) لا تُرفع أبداً — كلمة سره معروفة
-    const accounts = (await allAccountsIncludingDeleted()).filter((a) => !a.seeded);
-    for (const group of chunk(accounts, 100)) {
-      const { error } = await sb.from('accounts').upsert(group.map(accountRow));
-      if (error) failures.push(`accounts: ${error.message}`);
-      else pushed += group.length;
-    }
-    await pruneDuplicateAccounts(sb, accounts);
+    /**
+     * الحسابات لا تُرفع من هنا: الرفع الكامل مخصّص لبيانات الطلاب والتقييمات،
+     * ورفع حساب قديم كان يطمس إسنادات أحدث (مقررات/مراحل) أجراها جهاز آخر.
+     * المزامنة الدورية (`sync`) تسحب الحسابات وتدمجها ثم ترفعها بأمان.
+     */
 
     const uniqueFailures = [...new Set(failures)];
     return {

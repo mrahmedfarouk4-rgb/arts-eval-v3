@@ -15,7 +15,7 @@ import {
 } from '@/constants/criteria';
 import { useSession } from '@/lib/session';
 import { useAuth } from '@/lib/auth';
-import { visibleGrades } from '@/lib/accounts';
+import { visibleGrades, visibleSubjects } from '@/lib/accounts';
 import { listEvaluations, listStudents, type Evaluation } from '@/lib/store';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -225,7 +225,7 @@ export default function GradesScreen() {
     const set = new Set<string>();
     for (const g of ACTIVE_GRADES) {
       if (!allowed.has(g.id)) continue;
-      for (const sid of subjectsForGrade(g.id, 'all')) set.add(sid);
+      for (const sid of visibleSubjects(user, subjectsForGrade(g.id, 'all'))) set.add(sid);
     }
     return set.size;
   }, [user]);
@@ -243,7 +243,10 @@ export default function GradesScreen() {
       kicker: 'المرحلة الدراسية',
       meta: [
         'فصلان',
-        `${ar(subjectsForGrade(g.id, 'term1').length + subjectsForGrade(g.id, 'term2').length)} مقررات`,
+        `${ar(
+          visibleSubjects(user, subjectsForGrade(g.id, 'term1')).length +
+            visibleSubjects(user, subjectsForGrade(g.id, 'term2')).length
+        )} مقررات`,
       ],
     }));
   }, [user]);
