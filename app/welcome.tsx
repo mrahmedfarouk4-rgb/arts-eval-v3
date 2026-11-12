@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, TextInput, Pressable, ScrollView, Image,
-  KeyboardAvoidingView, Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LiftPressable, useFloatStyle } from '@/components/motion';
+import { c, fnt, fs, ORG, rad, sp } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
+import { CRITERIA_COUNT } from '@/constants/criteria';
+import { useAuth } from '@/lib/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { c, sp, rad, fnt, fs, ORG } from '@/constants/brand';
-import { useAuth } from '@/lib/auth';
-import { DEFAULT_ADMIN } from '@/lib/accounts';
-import { CRITERIA_COUNT } from '@/constants/criteria';
+import React, { useState } from 'react';
+import {
+    Image,
+    KeyboardAvoidingView, Platform,
+    Pressable, ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const HERO_BG = require('@/assets/brand/bg-school-gate.jpg');
 const AFAQ_LOGO = require('@/assets/brand/afaq-logo.png');
@@ -25,22 +31,31 @@ const ar = (n: number | string) =>
  */
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { login, skip, adminPwIsDefault, loginError } = useAuth();
+  const { login, skip, loginError } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [typing, setTyping] = useState(false);
+
+  /** البطاقة تطفو بهدوء، وتستقرّ فوراً حين يبدأ المستخدم بالكتابة */
+  const floatStyle = useFloatStyle({ amplitude: 4, duration: 7000, enabled: !typing });
 
   const onLogin = async () => {
     setError('');
     if (!username.trim()) return setError('أدخل اسم المستخدم');
     if (!password) return setError('أدخل كلمة المرور');
     setBusy(true);
-    const r = await login(username.trim(), password);
-    setBusy(false);
-    if (r.ok) router.replace('/(tabs)');
-    else setError(r.reason ? loginError(r.reason) : 'تعذّر تسجيل الدخول');
+    try {
+      const r = await login(username.trim(), password);
+      if (r.ok) router.replace('/(tabs)');
+      else setError(r.reason ? loginError(r.reason) : 'تعذّر تسجيل الدخول');
+    } catch (e) {
+      setError(e instanceof Error ? `تعذّر الاتصال: ${e.message}` : 'تعذّر تسجيل الدخول');
+    } finally {
+      setBusy(false);
+    }
   };
 
   /** ضغطة الزائر ← نماذج الاستمارات المطبوعة */
@@ -96,14 +111,17 @@ export default function WelcomeScreen() {
             <Animated.Text entering={FadeInDown.delay(100).duration(600)} style={s.sub}>{ORG.appSub}</Animated.Text>
 
             {/* شريط إحصاء سريع */}
-            <View style={s.stats}>
+            <Animated.View entering={FadeInDown.delay(150).duration(500)} style={s.stats}>
               <Stat value={ar(4)} label="مراحل دراسية" />
               <Stat value={ar(7)} label="مقررات فنية" />
               <Stat value={ar(CRITERIA_COUNT)} label="بند تقييم" />
-            </View>
+            </Animated.View>
 
             {/* بطاقة الدخول */}
-            <Animated.View entering={FadeInDown.delay(250).duration(700)} style={s.card}>
+            <Animated.View
+              entering={FadeInDown.delay(250).duration(700)}
+              style={[s.card, floatStyle]}
+            >
               {/* الشعار في أعلى البطاقة — على نمط بوابة وزارة الثقافة */}
               <View style={s.cardLogos}>
                 <Image source={AFAQ_LOGO} style={s.cardLogo} resizeMode="contain" />
@@ -127,6 +145,8 @@ export default function WelcomeScreen() {
                     style={s.input}
                     autoCapitalize="none"
                     returnKeyType="next"
+                    onFocus={() => setTyping(true)}
+                    onBlur={() => setTyping(false)}
                   />
                 </View>
 
@@ -141,6 +161,8 @@ export default function WelcomeScreen() {
                     secureTextEntry={!showPass}
                     returnKeyType="go"
                     onSubmitEditing={onLogin}
+                    onFocus={() => setTyping(true)}
+                    onBlur={() => setTyping(false)}
                   />
                   <Pressable onPress={() => setShowPass((v) => !v)} hitSlop={10}>
                     <Ionicons
@@ -151,31 +173,16 @@ export default function WelcomeScreen() {
                   </Pressable>
                 </View>
 
-                {adminPwIsDefault && (
-                  <Pressable
-                    onPress={() => {
-                      setUsername(DEFAULT_ADMIN.username);
-                      setPassword(DEFAULT_ADMIN.password);
-                      setError('');
-                    }}
-                    style={s.seedHint}
-                    accessibilityRole="button"
-                  >
-                    <Ionicons name="key" size={12} color={c.primary} />
-                    <Text style={s.seedHintText}>
-                      حساب المشرف: {DEFAULT_ADMIN.username} / {DEFAULT_ADMIN.password}
-                      {' — '}اضغط للتعبئة، ثم غيّرها من الإعدادات
-                    </Text>
-                  </Pressable>
-                )}
-
                 {!!error && <Text style={s.err}>{error}</Text>}
 
-                <Pressable
+                <LiftPressable
                   onPress={onLogin}
                   disabled={busy}
-                  style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.97 : 1 }], opacity: pressed ? 0.92 : 1 }]}
-                  accessibilityRole="button"
+                  lift={1.5}
+                  hoverScale={1.012}
+                  pressScale={0.97}
+                  accessibilityLabel="دخول"
+                  accessibilityState={{ disabled: busy, busy }}
                 >
                   <LinearGradient
                     colors={[c.primary, c.primaryHi]}
@@ -186,17 +193,21 @@ export default function WelcomeScreen() {
                     <Text style={s.ctaText}>{busy ? 'جارٍ…' : 'دخول'}</Text>
                     <Ionicons name="arrow-back" size={17} color={c.onPrimary} />
                   </LinearGradient>
-                </Pressable>
+                </LiftPressable>
 
-                <Pressable
+                <LiftPressable
                   onPress={onGuest}
                   disabled={busy}
-                  style={({ pressed }) => [s.ghost, pressed && { opacity: 0.85 }]}
-                  accessibilityRole="button"
+                  lift={0}
+                  hoverScale={1.01}
+                  pressScale={0.97}
+                  style={s.ghost}
+                  accessibilityLabel="الدخول كضيف"
+                  accessibilityState={{ disabled: busy }}
                 >
                   <Text style={s.ghostText}>الدخول كضيف</Text>
                   <Ionicons name="arrow-back" size={16} color={c.primary} />
-                </Pressable>
+                </LiftPressable>
 
                 <Text style={s.guestHint}>
                   الدخول كضيف يعرض نماذج التقييمات المطبوعة فقط.
@@ -227,6 +238,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   scroll: {
+    ...contentColumn,
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',

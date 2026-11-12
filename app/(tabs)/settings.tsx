@@ -346,29 +346,16 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <Badge
-                label={settings?.sync_enabled ? 'مفعّلة' : 'معطّلة'}
-                color={settings?.sync_enabled ? c.okText : c.text3}
-                bg={settings?.sync_enabled ? c.okBg : c.bgLift}
+                label={ready ? 'تلقائية' : 'معطّلة'}
+                color={ready ? c.okText : c.text3}
+                bg={ready ? c.okBg : c.bgLift}
               />
             </View>
 
             {ready && (
-              <Pressable
-                onPress={async () => {
-                  await updateSettings({ sync_enabled: !settings?.sync_enabled });
-                  await refresh();
-                }}
-                style={({ pressed }) => [s.checkRow, pressed && { opacity: 0.75 }]}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: !!settings?.sync_enabled }}
-              >
-                <Text style={s.checkLabel}>تفعيل المزامنة</Text>
-                <Ionicons
-                  name={settings?.sync_enabled ? 'checkbox' : 'square-outline'}
-                  size={21}
-                  color={settings?.sync_enabled ? c.primary : c.text4}
-                />
-              </Pressable>
+              <Text style={[s.note, { marginTop: sp.sm }]}>
+                لا تحتاج إلى ضغط أي زر: تُرفع التعديلات تلقائياً بعد الحفظ، وعند فتح التطبيق، وكل دقيقتين.
+              </Text>
             )}
 
             <Button

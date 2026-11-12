@@ -52,6 +52,11 @@ export interface Account {
    */
   updatedAt?: string;
   /**
+   * حساب مُزرَع محلياً عند أول تشغيل (المشرف الافتراضي).
+   * لا يُرفع إلى السحابة ولا يطمس حساباً حقيقياً بنفس اسم الدخول.
+   */
+  seeded?: boolean;
+  /**
    * علامة حذف — لا نحذف الصف من الملف حتى يُحذف من السحابة أيضاً،
    * وإلا عاد من جهاز آخر في المزامنة التالية.
    */
@@ -130,6 +135,8 @@ function seedAdmin(): AccountsFile {
     pwHash: hashPassword(DEFAULT_ADMIN.password),
     subjectIds: [],
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    seeded: true,
   });
   f.adminPwHash = hashPassword(DEFAULT_ADMIN.password);
   return f;
@@ -296,7 +303,12 @@ export async function updateAccount(
     }
   }
 
-  f.accounts[i] = { ...f.accounts[i], ...next, updatedAt: new Date().toISOString() };
+  f.accounts[i] = {
+    ...f.accounts[i],
+    ...next,
+    seeded: false,
+    updatedAt: new Date().toISOString(),
+  };
   await save(f);
   return { ok: true };
 }
@@ -338,6 +350,7 @@ export async function mergeAccountsFromRemote(remote: Account[]): Promise<number
     subjectIds: Array.isArray(r.subjectIds) ? r.subjectIds : [],
     createdAt: r.createdAt || new Date().toISOString(),
     updatedAt: r.updatedAt || r.createdAt || new Date().toISOString(),
+    seeded: false,
     deleted: r.deleted === true,
   });
 
@@ -351,7 +364,9 @@ export async function mergeAccountsFromRemote(remote: Account[]): Promise<number
      * ونُبقي المعرّف المحلي، وإلا تكرّر اسم الدخول في كل جهاز.
      */
     const local = byId.get(r.id) ?? byUsername.get(r.username);
-    if (local && stamp(r) <= stamp(local)) continue;
+    // الحساب المزروع لا يغلب الحساب الحقيقي مهما كان التاريخ
+    const forced = !!local?.seeded && !r.deleted;
+    if (local && !forced && stamp(r) <= stamp(local)) continue;
 
     const targetId = local?.id ?? r.id;
     byId.set(targetId, { ...r, id: targetId });
@@ -408,6 +423,7 @@ export async function setAccountPassword(
   if (bad) return { ok: false, error: bad };
 
   a.pwHash = hashPassword(password);
+  a.seeded = false;
   a.updatedAt = new Date().toISOString();
   // كلمة سر المشرف خ人人都يتها تاريخياً — نبقيها متزامنة
   if (a.role === 'admin') {
@@ -415,6 +431,7 @@ export async function setAccountPassword(
     f.accounts.forEach((x) => {
       if (x.role === 'admin' && x.id !== id) {
         x.pwHash = a.pwHash;
+        x.seeded = false;
         x.updatedAt = new Date().toISOString();
       }
     });
@@ -437,7 +454,7 @@ export async function setRolePassword(
 
   const h = hashPassword(password);
   const now = new Date().toISOString();
-  targets.forEach((a) => { a.pwHash = h; a.updatedAt = now; });
+  targets.forEach((a) => { a.pwHash = h; a.seeded = false; a.updatedAt = now; });
   if (role === 'admin') f.adminPwHash = h;
   else f.teacherPwHash = h;
 

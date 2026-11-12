@@ -123,11 +123,11 @@ export default function RootLayout() {
   useWebFocusRing();
 
   useEffect(() => {
-    // مزامنة تلقائية: عند البداية (بعد 5s)، عند focus، وكل 5 دقائق
-    scheduleAutoSync(5000);
-    const onFocus = () => scheduleAutoSync(1000);
+    // مزامنة تلقائية: عند البداية، عند focus، وكل دقيقتين
+    scheduleAutoSync(1500);
+    const onFocus = () => scheduleAutoSync(800);
     if (typeof window !== 'undefined') window.addEventListener('focus', onFocus);
-    const interval = setInterval(() => scheduleAutoSync(0), 5 * 60 * 1000);
+    const interval = setInterval(() => scheduleAutoSync(0), 2 * 60 * 1000);
     return () => {
       if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus);
       clearInterval(interval);

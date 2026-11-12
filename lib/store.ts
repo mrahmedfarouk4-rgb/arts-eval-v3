@@ -404,7 +404,7 @@ export function supabaseReady(): boolean {
 const DEFAULT_SETTINGS: Settings = {
   teacher_name: null,
   edit_mode: false,
-  sync_enabled: false,
+  sync_enabled: true,
   last_sync: null,
 };
 
@@ -977,13 +977,12 @@ let autoSyncTimer: ReturnType<typeof setTimeout> | null = null;
  * - لا تفعل شيئاً إذا كانت المزامنة معطّلة.
  * - تمنع التكرار (debounce).
  */
-export function scheduleAutoSync(delayMs = 3000): void {
+export function scheduleAutoSync(delayMs = 3000, waitForEnable = true): void {
+  void waitForEnable;
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
   autoSyncTimer = setTimeout(async () => {
     autoSyncTimer = null;
     try {
-      const s = await getSettings();
-      if (!s.sync_enabled) return;
       await sync();
     } catch {
       /* silent — المزامنة اليدوية («مزامنة الآن») تُظهر الخطأ */
@@ -1044,6 +1043,13 @@ function pick(row: Record<string, unknown>, cols: string[]): Record<string, unkn
   return out;
 }
 
+/** تقسيم مصفوفة إلى دفعات — الرفع دفعة واحدة أسرع بكثير من صفٍّ صفّاً */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 /** صف الحساب كما يُخزَّن في جدول accounts */
 function accountRow(a: Account): Record<string, unknown> {
   return pick(
@@ -1079,6 +1085,34 @@ function accountFromRow(r: Record<string, unknown>): Account {
   };
 }
 
+/**
+ * سحب الحسابات فقط — خفيف وسريع، يُستخدم قبل تسجيل الدخول
+ * حتى يجد الجهاز الجديد حساب المعلم المنشأ على جهاز آخر.
+ * لا يرفع شيئاً (لا نريد لحساب محلي افتراضي أن يطمس حساباً حقيقياً).
+ */
+export async function syncAccounts(timeoutMs = 10000): Promise<{ ok: boolean; error?: string }> {
+  const sb = initSupabase();
+  if (!sb) return { ok: false, error: 'المزامنة غير مهيّأة' };
+
+  const work = (async () => {
+    const { data, error } = await sb.from('accounts').select('*');
+    if (error) return { ok: false as const, error: error.message };
+    const rows = ((data ?? []) as Record<string, unknown>[]).map(accountFromRow);
+    await mergeAccountsFromRemote(rows);
+    return { ok: true as const };
+  })();
+
+  const timeout = new Promise<{ ok: false; error: string }>((resolve) => {
+    setTimeout(() => resolve({ ok: false, error: 'انتهت مهلة الاتصال بالسحابة' }), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([work, timeout]);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'خطأ غير معروف' };
+  }
+}
+
 export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> {
   const sb = initSupabase();
   if (!sb) {
@@ -1086,32 +1120,40 @@ export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> 
   }
 
   const settings = await getSettings();
-  if (!settings.sync_enabled && !opts.force) {
-    return { ok: false, pushed: 0, pulled: { students: 0, evaluations: 0 }, error: 'المزامنة معطّلة' };
-  }
-
+  // المزامنة تعمل دائماً — لا مفتاح يُعطّلها. `force` باقٍ للتوافق فقط.
+  void opts;
   try {
     const queue = await read<QueueItem[]>(K.syncQueue, []);
     let pushed = 0;
     const failures: string[] = [];
 
-    // 1) رفع الطابور (التغييرات منذ آخر مزامنة) — ما يفشل يبقى في الطابور للمحاولة التالية
+    // 1) رفع الطابور (التغييرات منذ آخر مزامنة) — دفعات، وما يفشل يبقى للمحاولة التالية
     const remaining: QueueItem[] = [];
+    const upserts: Record<'students' | 'evaluations', QueueItem[]> = { students: [], evaluations: [] };
+    const deletes: Record<'students' | 'evaluations', QueueItem[]> = { students: [], evaluations: [] };
+
     for (const item of queue) {
-      const table = item.table;
-      if (item.op === 'delete') {
-        const { error } = await sb.from(table).delete().eq('id', item.rowId);
+      if (item.op === 'delete') deletes[item.table].push(item);
+      else upserts[item.table].push(item);
+    }
+
+    for (const table of ['students', 'evaluations'] as const) {
+      for (const group of chunk(upserts[table], 100)) {
+        const { error } = await sb.from(table).upsert(group.map((i) => toRow(table, i.payload)));
         if (error) {
           failures.push(`${table}: ${error.message}`);
-          remaining.push({ ...item, tries: (item.tries ?? 0) + 1 });
-        } else pushed++;
-      } else {
-        const { error } = await sb.from(table).upsert(toRow(table, item.payload));
-        if (error) {
-          failures.push(`${table}: ${error.message}`);
-          remaining.push({ ...item, tries: (item.tries ?? 0) + 1 });
+          remaining.push(...group.map((i) => ({ ...i, tries: (i.tries ?? 0) + 1 })));
         } else {
-          pushed++;
+          pushed += group.length;
+        }
+      }
+      for (const group of chunk(deletes[table], 100)) {
+        const { error } = await sb.from(table).delete().in('id', group.map((i) => i.rowId));
+        if (error) {
+          failures.push(`${table}: ${error.message}`);
+          remaining.push(...group.map((i) => ({ ...i, tries: (i.tries ?? 0) + 1 })));
+        } else {
+          pushed += group.length;
         }
       }
     }
@@ -1122,21 +1164,22 @@ export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> 
     // 2) رفع ALL البيانات المحلية (فقط عند أول مزامنة — لضمان عدم فقدان بيانات أُنشئت قبل تفعيل المزامنة)
     const isFirstSync = !settings.last_sync;
     if (isFirstSync) {
-      for (const s of localStudents) {
-        const { error } = await sb.from('students').upsert(toRow('students', s));
+      for (const group of chunk(localStudents, 100)) {
+        const { error } = await sb.from('students').upsert(group.map((s) => toRow('students', s)));
         if (error) failures.push(`students: ${error.message}`);
-        else pushed++;
+        else pushed += group.length;
       }
-      for (const e of localEvals) {
-        if (e.deleted) continue;
-        const { error } = await sb.from('evaluations').upsert(toRow('evaluations', e));
+      const alive = localEvals.filter((e) => !e.deleted);
+      for (const group of chunk(alive, 100)) {
+        const { error } = await sb.from('evaluations').upsert(group.map((e) => toRow('evaluations', e)));
         if (error) failures.push(`evaluations: ${error.message}`);
-        else pushed++;
+        else pushed += group.length;
       }
     }
 
     // 3) الحسابات — قليلة العدد، تُرفع في كل مزامنة حتى تصل إلى بقية الأجهزة
-    const localAccounts = await allAccountsIncludingDeleted();
+    //    (نتجاهل الحساب المزروع محلياً بكلمة السر الافتراضية: لا يُشارَك أبداً)
+    const localAccounts = (await allAccountsIncludingDeleted()).filter((a) => !a.seeded);
     for (const a of localAccounts) {
       const { error } = await sb.from('accounts').upsert(accountRow(a));
       if (error) failures.push(`accounts: ${error.message}`);
@@ -1211,21 +1254,21 @@ export async function uploadAll(): Promise<SyncResult> {
     let pushed = 0;
     const failures: string[] = [];
 
-    for (const s of students) {
-      const { error } = await sb.from('students').upsert(toRow('students', s));
+    for (const group of chunk(students, 100)) {
+      const { error } = await sb.from('students').upsert(group.map((s) => toRow('students', s)));
       if (error) failures.push(`students: ${error.message}`);
-      else pushed++;
+      else pushed += group.length;
     }
-    for (const e of evals) {
-      const { error } = await sb.from('evaluations').upsert(toRow('evaluations', e));
+    for (const group of chunk(evals, 100)) {
+      const { error } = await sb.from('evaluations').upsert(group.map((e) => toRow('evaluations', e)));
       if (error) failures.push(`evaluations: ${error.message}`);
-      else pushed++;
+      else pushed += group.length;
     }
 
-    for (const a of await allAccountsIncludingDeleted()) {
-      const { error } = await sb.from('accounts').upsert(accountRow(a));
+    for (const group of chunk(await allAccountsIncludingDeleted(), 100)) {
+      const { error } = await sb.from('accounts').upsert(group.map(accountRow));
       if (error) failures.push(`accounts: ${error.message}`);
-      else pushed++;
+      else pushed += group.length;
     }
 
     const uniqueFailures = [...new Set(failures)];

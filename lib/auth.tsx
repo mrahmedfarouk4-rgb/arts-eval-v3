@@ -14,7 +14,7 @@ import {
   authenticate, clearSession, isAdminPasswordDefault, persistSession, readSession,
   type AuthFailure, type Role,
 } from '@/lib/accounts';
-import { sync } from '@/lib/store';
+import { syncAccounts } from '@/lib/store';
 import type { SubjectId } from '@/constants/criteria';
 
 // مُعاد التصدير: الجلسة تحتاج قراءة الحساب المحفوظ لتملأ «اسم المعلم»
@@ -89,8 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      */
     if (!r.ok && (r.reason === 'not-found' || r.reason === 'not-configured')) {
       try {
-        // force: قد تكون المزامنة معطّلة على جهاز جديد — نريد سحب الحسابات فقط
-        await sync({ force: true });
+        // سحب الحسابات فقط (سريع) — الحساب قد يكون أُنشئ على جهاز آخر
+        await syncAccounts(10000);
       } catch {
         /* بلا اتصال: نكمل برسالة الفشل الأصلية */
       }
