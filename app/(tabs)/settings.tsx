@@ -293,7 +293,7 @@ export default function SettingsScreen() {
             <Line
               icon={authenticated ? 'shield-checkmark-outline' : 'eye-outline'}
               label="الصلاحية"
-              value={authenticated ? (user?.role === 'admin' ? 'مشرف — كل المقررات' : 'معلم — مقرراته المسندة') : 'بدون تسجيل دخول'}
+              value={authenticated ? (user?.role === 'admin' ? 'مشرف — كل المقررات والمراحل' : 'معلم — مقرراته ومراحله المسندة') : 'بدون تسجيل دخول'}
               color={authenticated ? c.okText : c.text3}
             />
             <Line

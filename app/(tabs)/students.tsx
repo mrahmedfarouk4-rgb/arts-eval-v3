@@ -1,28 +1,40 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, Pressable, TextInput, Alert,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { PageHero, SectionHead } from '@/components/page-hero';
+import { Badge, Button, Card, Empty } from '@/components/pro-ui';
+import { SkeletonRows } from '@/components/skeleton';
+import { BRAND_TONE, c, fnt, fs, rad, sh, sp } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
 import { GRADES, gradeName, type GradeId } from '@/constants/criteria';
-import { c, sp, rad, fnt, fs, sh } from '@/constants/brand';
-import { Button, Card, Badge, Empty, BrandBar } from '@/components/pro-ui';
-import { useSession } from '@/lib/session';
+import { visibleGrades } from '@/lib/accounts';
+import { useAuth } from '@/lib/auth';
 import { confirmAction } from '@/lib/dialog';
+import { useSession } from '@/lib/session';
 import {
-  listStudents,
-  createStudent,
-  deleteStudent,
-  archiveStudent,
-  listEvaluations,
-  type Student,
+    archiveStudent,
+    createStudent,
+    deleteStudent,
+    listEvaluations,
+    listStudents,
+    type Student,
 } from '@/lib/store';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    Alert,
+    FlatList,
+    KeyboardAvoidingView, Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function StudentsScreen() {
   const router = useRouter();
   const { editMode } = useSession();
+  const { user } = useAuth();
 
   const [students, setStudents] = useState<Student[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -32,6 +44,25 @@ export default function StudentsScreen() {
   const [grade, setGrade] = useState<GradeId>('grade4');
   const [query, setQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState<GradeId | 'all'>('all');
+
+  /** المراحل المسندة لهذا الحساب — المعلم لا يرى غيرها */
+  const activeGrades = useMemo(() => {
+    const allIds = GRADES.filter((g) => g.id !== 'intermediate1').map((g) => g.id) as GradeId[];
+    const allowed = new Set(visibleGrades(user, allIds));
+    return GRADES.filter((g) => g.id !== 'intermediate1' && allowed.has(g.id));
+  }, [user]);
+
+  /** الطلاب داخل المراحل المسندة فقط */
+  const visibleStudents = useMemo(() => {
+    const set = new Set(activeGrades.map((g) => g.id));
+    return students.filter((s) => s.grade_id && set.has(s.grade_id));
+  }, [students, activeGrades]);
+
+  useEffect(() => {
+    if (activeGrades.length && !activeGrades.some((g) => g.id === grade)) {
+      setGrade(activeGrades[0].id);
+    }
+  }, [activeGrades, grade]);
 
   const load = useCallback(async () => {
     try {
@@ -51,12 +82,12 @@ export default function StudentsScreen() {
 
   const filtered = useMemo(
     () =>
-      students.filter((s) => {
+      visibleStudents.filter((s) => {
         const byName = query.trim() ? s.name.includes(query.trim()) : true;
         const byGrade = gradeFilter === 'all' ? true : s.grade_id === gradeFilter;
         return byName && byGrade;
       }),
-    [students, query, gradeFilter]
+    [visibleStudents, query, gradeFilter]
   );
 
   const onAdd = async () => {
@@ -93,19 +124,24 @@ export default function StudentsScreen() {
     await load();
   };
 
-  const activeGrades = GRADES.filter((g) => g.id !== 'intermediate1');
-
   return (
     <SafeAreaView style={s.root} edges={['top']}>
-      <BrandBar
-        right={
-          editMode ? (
-            <Button label="إضافة" size="sm" icon="add" onPress={() => setShowAdd(true)} />
-          ) : (
-            <Badge label="وضع العرض" color={c.text3} bg={c.bgLift} />
-          )
-        }
-      />
+      <View style={s.heroWrap}>
+        <PageHero
+          tone={BRAND_TONE}
+          eyebrow="سجل الطلاب"
+          title="الطلاب"
+          sub={`${visibleStudents.length} طالب موزّعين على ${activeGrades.length} مراحل`}
+          compact
+          right={
+            editMode ? (
+              <Button label="إضافة" size="sm" icon="add" onPress={() => setShowAdd(true)} />
+            ) : (
+              <Badge label="وضع العرض" color={c.text3} bg={c.bgLift} />
+            )
+          }
+        />
+      </View>
 
       {/* بحث */}
       <View style={s.searchWrap}>
@@ -136,11 +172,11 @@ export default function StudentsScreen() {
             accessibilityState={{ selected: gradeFilter === 'all' }}
           >
             <Text style={[s.chipText, gradeFilter === 'all' && s.chipTextOn]}>
-              الكل ({students.length})
+              الكل ({visibleStudents.length})
             </Text>
           </Pressable>
           {activeGrades.map((g) => {
-            const n = students.filter((s) => s.grade_id === g.id).length;
+            const n = visibleStudents.filter((s) => s.grade_id === g.id).length;
             return (
               <Pressable
                 key={g.id}
@@ -159,9 +195,15 @@ export default function StudentsScreen() {
         </View>
       </View>
 
+      {!loading && filtered.length > 0 && (
+        <View style={s.listHead}>
+          <SectionHead title="قائمة الطلاب" count={filtered.length} tone={BRAND_TONE} />
+        </View>
+      )}
+
       {loading ? (
-        <View style={s.center}>
-          <ActivityIndicator color={c.primary} />
+        <View style={s.skel}>
+          <SkeletonRows rows={5} />
         </View>
       ) : filtered.length === 0 ? (
         <Empty
@@ -306,7 +348,9 @@ export default function StudentsScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  skel: { paddingHorizontal: sp.lg, paddingTop: sp.md },
+  heroWrap: { paddingHorizontal: sp.lg, paddingTop: sp.md },
+  listHead: { paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.xs },
 
   searchWrap: { paddingHorizontal: sp.lg, paddingTop: sp.md },
   search: {
@@ -332,7 +376,7 @@ const s = StyleSheet.create({
   chipText: { fontFamily: fnt.m, fontSize: fs.xs, color: c.text2 },
   chipTextOn: { color: c.onPrimary, fontFamily: fnt.b },
 
-  list: { paddingHorizontal: sp.lg, paddingBottom: sp.huge },
+  list: { ...contentColumn, paddingHorizontal: sp.lg, paddingBottom: sp.huge },
   row: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
   avatar: {
     width: 40, height: 40, borderRadius: 20,

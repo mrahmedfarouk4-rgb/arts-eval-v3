@@ -9,11 +9,21 @@ import {
   setAccountPassword, setRolePassword, isWeakDefault,
   type Account, type Role,
 } from '@/lib/accounts';
-import { SUBJECTS, subjectName, type SubjectId } from '@/constants/criteria';
+import { SUBJECTS, GRADES, subjectName, type SubjectId, type GradeId } from '@/constants/criteria';
 import { scheduleAutoSync } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 
 const ALL_SUBJECTS = SUBJECTS.map((x) => x.id) as SubjectId[];
+/** المراحل الفعلية (بلا المعرّف القديم) */
+const ACTIVE_GRADES = GRADES.filter((g) => g.id !== 'intermediate1');
+const ALL_GRADES = ACTIVE_GRADES.map((g) => g.id) as GradeId[];
+
+function gradeSummary(ids?: GradeId[]): string {
+  if (!ids?.length) return 'كل المراحل';
+  return ids
+    .map((id) => ACTIVE_GRADES.find((g) => g.id === id)?.name ?? id)
+    .join('، ');
+}
 
 /**
  * إعداد المعلمين ومقرراتهم وكلمات سرهم — للمشرف فقط.
@@ -21,6 +31,7 @@ const ALL_SUBJECTS = SUBJECTS.map((x) => x.id) as SubjectId[];
  * ما يتيحه هذا القسم:
  *   • حساب لكل معلم باسم دخول وكلمة سر **خاصة به** (لا يتقاسمها مع غيره)
  *   • إسناد المقررات: المعلم لا يرى في التقييم إلا مقرراته
+ *   • إسناد المراحل: المعلم لا يرى في لوحة العمل إلا صفوفه
  *   • إيقاف/تفعيل/حذف أي حساب بلا إعادة بناء للتطبيق
  *
  * القائمة محلية على الجهاز ولا تحتاج إعادة بناء، وهذا مقصود: كل معلم
@@ -63,7 +74,7 @@ export function TeachersPanel({ onChanged }: { onChanged?: () => void }) {
   return (
     <Section
       title="إعداد المعلمين والمقررات"
-      hint="أضف معلماً، أسند إليه مقرراته، وضع له كلمة سر خاصة"
+      hint="أضف معلماً، أسند إليه مقرراته ومراحله، وضع له كلمة سر خاصة"
       count={accounts?.length ?? 0}
     >
       {adding ? (
@@ -143,6 +154,11 @@ export function TeachersPanel({ onChanged }: { onChanged?: () => void }) {
                     {' · '}
                     {!a.pwHash ? 'بلا كلمة سر' : isWeakDefault(a.pwHash) ? 'كلمة سر ضعيفة' : 'له كلمة سر'}
                   </Text>
+                  {a.role === 'teacher' && (
+                    <Text style={s.accMeta} numberOfLines={1}>
+                      المراحل: {gradeSummary(a.gradeIds)}
+                    </Text>
+                  )}
                 </View>
                 <Ionicons name="chevron-back" size={16} color={c.text4} />
               </Pressable>
@@ -215,6 +231,7 @@ function AccountForm({
     name: string;
     role: Role;
     subjectIds: SubjectId[];
+    gradeIds: GradeId[];
     password?: string;
     enabled?: boolean;
   }) => void | Promise<void>;
@@ -229,11 +246,18 @@ function AccountForm({
   const [subjects, setSubjects] = useState<SubjectId[]>(
     initial ? initial.subjectIds ?? [] : ALL_SUBJECTS
   );
+  // وكذلك المراحل: تبدأ كلها محدّدة، ويضيّقها المشرف
+  const [grades, setGrades] = useState<GradeId[]>(
+    initial ? initial.gradeIds ?? [] : ALL_GRADES
+  );
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
 
   const toggleSubject = (id: SubjectId) =>
     setSubjects((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]));
+
+  const toggleGrade = (id: GradeId) =>
+    setGrades((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]));
 
   const submit = () =>
     onSave({
@@ -241,6 +265,7 @@ function AccountForm({
       name,
       role,
       subjectIds: subjects,
+      gradeIds: grades,
       ...(initial ? { enabled } : {}),
       // الحساب الجديد يأخذ كلمته عند الإنشاء؛ والتعديل له زر منفصل
       ...(initial ? {} : { password: pw }),
@@ -307,6 +332,42 @@ function AccountForm({
         {subjects.length === 0
           ? 'بلا مقررات — المعلم لن يرى شيئاً حتى تُسند إليه مقرراً.'
           : `${subjects.length} مقرر مُسند`}
+      </Text>
+
+      {/* المراحل المسندة — المعلم لا يرى غيرها في لوحة العمل */}
+      <Text style={[s.fieldLabel, { marginTop: sp.md }]}>
+        المراحل الدراسية المسندة {role === 'admin' ? '(المشرف يرى الكل — لا تُهمَل)' : ''}
+      </Text>
+      <Text style={s.hint}>
+        لن يرى المعلم في لوحة العمل وفي السجلات إلا هذه الصفوف.
+      </Text>
+      <View style={s.subjGrid}>
+        {ACTIVE_GRADES.map((g) => {
+          const on = grades.includes(g.id);
+          return (
+            <Pressable
+              key={g.id}
+              onPress={() => toggleGrade(g.id)}
+              style={[s.subjChip, on && s.subjChipOn]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+            >
+              <Ionicons
+                name={on ? 'checkmark-circle' : 'ellipse-outline'}
+                size={13}
+                color={on ? c.primary : c.text4}
+              />
+              <Text style={[s.subjChipText, on && { color: c.primary }]}>
+                {g.name.replace('الصف ', '').replace(' الابتدائي', '').replace(' المتوسط', '')}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={s.hint}>
+        {grades.length === 0
+          ? 'بلا تحديد — يرى المعلم كل المراحل. حدّد صفاً واحداً على الأقل لتقصيره عليه.'
+          : `${grades.length} مرحلة مُسندة`}
       </Text>
 
       {/* كلمة السر */}

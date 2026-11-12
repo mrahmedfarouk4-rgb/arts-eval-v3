@@ -1,22 +1,44 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, ScrollView, Image, Pressable } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { CountUp } from '@/components/count-up';
+import { GradeStack, type GradeCardItem } from '@/components/grade-stack';
+import { LiftPressable, useToneVeil } from '@/components/motion';
+import { useResponsive } from '@/hooks/use-responsive';
 import {
-  GRADES, subjectsForGrade, gradeName, CRITERIA_COUNT,
-} from '@/constants/criteria';
-import { c, sp, rad, fnt, fs, gradeTone } from '@/constants/brand';
-import {
-  Tile, WeekStrip, ar,
-  type WeekDay,
+    Tile, WeekStrip, ar,
+    type WeekDay,
 } from '@/components/pro-ui';
+import { c, fnt, fs, gradeTone, rad, sp } from '@/constants/brand';
+import {
+    CRITERIA_COUNT,
+    GRADES,
+    gradeName,
+    subjectsForGrade,
+} from '@/constants/criteria';
 import { useSession } from '@/lib/session';
+import { useAuth } from '@/lib/auth';
+import { visibleGrades } from '@/lib/accounts';
 import { listEvaluations, listStudents, type Evaluation } from '@/lib/store';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    Easing,
+    Extrapolation,
+    FadeIn,
+    FadeInDown,
+    cancelAnimation,
+    interpolate,
+    useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue,
+    withRepeat, withTiming,
+} from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const DAY_LABELS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+
+/** المراحل الفعلية — المعرّف القديم `intermediate1` لا يُعرض */
+const ACTIVE_GRADES = GRADES.filter((g) => g.id !== 'intermediate1');
+const ACTIVE_GRADE_IDS = ACTIVE_GRADES.map((g) => g.id);
 
 function weekStart(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -39,24 +61,144 @@ const rangeLabel = () => {
   return `${start.getDate()} ${MONTHS[start.getMonth()]} – ${end.getDate()} ${MONTHS[end.getMonth()]}`;
 };
 
+/**
+ * سؤال شائع — السهم يدور والسطر ينزلق بدل الظهور المفاجئ.
+ * ارتفاع البطاقة يتغيّر فوراً (لا LayoutAnimation) كي يبقى النقر تحت
+ * الإصبع بلا تأخير.
+ */
+function FaqRow({
+  q, a, open, onToggle,
+}: {
+  q: string;
+  a: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const reduce = useReducedMotion();
+  const turn = useSharedValue(open ? 1 : 0);
+
+  useEffect(() => {
+    turn.value = reduce ? (open ? 1 : 0) : withTiming(open ? 1 : 0, { duration: 180 });
+  }, [open, reduce, turn]);
+
+  const chevStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${turn.value * 180}deg` }],
+  }));
+
+  return (
+    <LiftPressable
+      onPress={onToggle}
+      lift={1.5}
+      hoverScale={1.004}
+      pressScale={0.99}
+      shadow={{ opacity: 0, hoverOpacity: 0.10, radius: 0, hoverRadius: 16 }}
+      style={s.faqCard}
+      accessibilityLabel={q}
+      accessibilityState={{ expanded: open }}
+    >
+      <View style={s.faqHead}>
+        <Text style={s.faqQ}>{q}</Text>
+        <Animated.View style={chevStyle}>
+          <Ionicons name="chevron-down" size={16} color={c.primary} />
+        </Animated.View>
+      </View>
+      {open && (
+        <Animated.Text entering={FadeInDown.duration(190)} style={s.faqA}>
+          {a}
+        </Animated.Text>
+      )}
+    </LiftPressable>
+  );
+}
+
 export default function GradesScreen() {
   const router = useRouter();
   const { setGrade, resetFlow } = useSession();
+  const { user } = useAuth();
+  const { isDesktop } = useResponsive();
 
   const [evals, setEvals] = useState<Evaluation[]>([]);
   const [students, setStudents] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
   const stagesY = useRef(0);
+
+  /** تمويه بسيط: الهيرو يتحرك أبطأ من المحتوى والصور خلفه أبطأ منه */
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+  const heroMotion = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(scrollY.value, [0, 280], [0, 46], Extrapolation.CLAMP) },
+    ],
+  }));
+  const bgMotion = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(scrollY.value, [0, 420], [0, -44], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  /** ترويسة مكثّفة — تظهر بعد تجاوز الهيرو فتبقى هوية الصفحة وإنجاز الأسبوع في النظر */
+  const stickyStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [120, 210], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateY: interpolate(scrollY.value, [120, 210], [-12, 0], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  /**
+   * حيّوية خفيفة لا تُشتّت: وميض يمرّ على الهيرو كل سبع ثوانٍ، وهالة
+   * تتنفّس خلف زرّ الإضافة. كلتاهما transform + opacity فقط، وتتوقّفان
+   * تماماً عند طلب تقليل الحركة.
+   */
+  const reduceMotion = useReducedMotion();
+  const sheen = useSharedValue(0);
+  const halo = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    sheen.value = withRepeat(
+      withTiming(1, { duration: 7000, easing: Easing.linear }),
+      -1,
+      false
+    );
+    return () => cancelAnimation(sheen);
+  }, [reduceMotion, sheen]);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    halo.value = withRepeat(
+      withTiming(1, { duration: 2600, easing: Easing.out(Easing.quad) }),
+      -1,
+      false
+    );
+    return () => cancelAnimation(halo);
+  }, [reduceMotion, halo]);
+
+  const sheenStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(sheen.value, [0, 0.18, 0.82, 1], [0, 0.16, 0.16, 0]),
+    transform: [
+      { translateX: interpolate(sheen.value, [0, 1], [-280, 560]) },
+      { rotate: '16deg' },
+    ],
+  }));
+
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(halo.value, [0, 0.18, 1], [0, 0.32, 0]),
+    transform: [{ scale: interpolate(halo.value, [0, 1], [1, 1.65]) }],
+  }));
 
   const reload = useCallback(async () => {
     try {
       const [ev, st] = await Promise.all([listEvaluations(), listStudents()]);
-      setEvals(ev);
-      setStudents(st.length);
+      // لا يُحصى ولا يُعرض إلا ما يخصّ مراحل الحساب المسندة
+      const allowed = new Set<string>(visibleGrades(user, ACTIVE_GRADE_IDS));
+      setEvals(ev.filter((e) => allowed.has(e.grade_id)));
+      setStudents(st.filter((s) => !!s.grade_id && allowed.has(s.grade_id)).length);
     } catch { /* تجاهل */ }
-  }, []);
+  }, [user]);
   useEffect(() => { void reload(); }, [reload]);
 
   const week = useMemo(() => {
@@ -79,18 +221,50 @@ export default function GradesScreen() {
   }, [evals]);
 
   const subjectTotal = useMemo(() => {
+    const allowed = new Set(visibleGrades(user, ACTIVE_GRADE_IDS));
     const set = new Set<string>();
-    for (const g of GRADES) {
-      if (g.id === 'intermediate1') continue;
+    for (const g of ACTIVE_GRADES) {
+      if (!allowed.has(g.id)) continue;
       for (const sid of subjectsForGrade(g.id, 'all')) set.add(sid);
     }
     return set.size;
-  }, []);
+  }, [user]);
+
+  /**
+   * بيانات عمود المراحل — تُحسب مرّة واحدة، فالتصنيف ثابت.
+   * نفس شكل بطاقات تقرير الستة أسابيع: رقم وتسمية وعنوان وعدّادات.
+   * تُقصَر على المراحل المسندة للمعلم (المشرف والزائر يريان الكل).
+   */
+  const gradeCards = useMemo<GradeCardItem[]>(() => {
+    const allowed = new Set(visibleGrades(user, ACTIVE_GRADE_IDS));
+    return ACTIVE_GRADES.filter((g) => allowed.has(g.id)).map((g) => ({
+      id: g.id,
+      title: gradeName(g.id),
+      kicker: 'المرحلة الدراسية',
+      meta: [
+        'فصلان',
+        `${ar(subjectsForGrade(g.id, 'term1').length + subjectsForGrade(g.id, 'term2').length)} مقررات`,
+      ],
+    }));
+  }, [user]);
 
   const open = (gradeId: string) => {
     setGrade(gradeId as never);
     router.push('/term' as never);
   };
+
+  /**
+   * انتقال الصفحة يبدأ من البطاقة نفسها: ستارة بلون المرحلة تنمو من
+   * مركز الشاشة خلال ١٩٠مم، ثم يُدفع المسار، فيهبط هيرو الفصل باللون
+   * ذاته. فيُقرأ الضغط كـ"فتح" للبطاقة لا كاستبدال مفاجئ للصفحة.
+   *
+   * لو فشل التنقّل لأي سبب تُعاد الستارة عند عودة التركيز للشاشة.
+   */
+  const { run: veilRun, style: veilStyle, color: veilColor, reset: veilReset } = useToneVeil(rad.xl);
+
+  const openStage = (id: string) => veilRun(gradeTone(id).deep, () => open(id));
+
+  useFocusEffect(useCallback(() => { veilReset(); }, [veilReset]));
 
   /** بدء تقييم جديد: تصفير الاختيارات ثم الانتقال إلى قائمة المراحل */
   const startEvaluation = useCallback(() => {
@@ -108,23 +282,39 @@ export default function GradesScreen() {
   return (
     <SafeAreaView style={s.root} edges={['top']}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Image
-          source={require('@/assets/brand/bg-school-gate.jpg')}
-          style={s.bgPhoto}
-          resizeMode="cover"
-        />
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(250,250,250,0.87)' }]} />
+        <Animated.View style={[StyleSheet.absoluteFill, bgMotion]}>
+          <Image
+            source={require('@/assets/brand/bg-school-gate.jpg')}
+            style={s.bgPhoto}
+            resizeMode="cover"
+          />
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(250,250,250,0.87)' }]} />
+        </Animated.View>
       </View>
 
-      <ScrollView ref={scrollRef} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView
+        ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={isDesktop ? s.scrollDesktop : s.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         {/* ===== Hero ===== */}
-        <Animated.View entering={FadeIn.duration(700)} style={s.hero}>
+        <Animated.View entering={FadeIn.duration(700)} style={[s.hero, heroMotion]}>
           <LinearGradient
             colors={[c.primarySoft, c.primary]}
             start={{ x: 0.1, y: 0 }}
             end={{ x: 0.9, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
+          <Animated.View pointerEvents="none" style={[s.sheen, sheenStyle]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
           <View style={s.heroContent}>
             <View style={s.heroBrand}>
               <Text style={s.heroEyebrow}>أكاديمية آفاق · الفنون البصرية</Text>
@@ -134,22 +324,30 @@ export default function GradesScreen() {
             <Text style={s.heroSub}>لوحة عمل المعلّم — كل ما تحتاجه بنظرة واحدة</Text>
             <View style={s.heroStats}>
               <View style={s.heroStat}>
-                <Text style={s.heroStatValue}>{ar(students)}</Text>
+                <CountUp value={students} style={s.heroStatValue} />
                 <Text style={s.heroStatLabel}>طالب</Text>
               </View>
               <View style={s.heroDivider} />
               <View style={s.heroStat}>
-                <Text style={s.heroStatValue}>{ar(subjectTotal)}</Text>
+                <CountUp value={subjectTotal} style={s.heroStatValue} />
                 <Text style={s.heroStatLabel}>مقرر</Text>
               </View>
               <View style={s.heroDivider} />
               <View style={s.heroStat}>
-                <Text style={s.heroStatValue}>{ar(CRITERIA_COUNT)}</Text>
+                <CountUp value={CRITERIA_COUNT} style={s.heroStatValue} />
                 <Text style={s.heroStatLabel}>بند</Text>
               </View>
               <View style={s.heroDivider} />
               <View style={s.heroStat}>
-                <Text style={s.heroStatValue}>{week.inWeek ? `${ar(Math.round(week.pct * 100))}٪` : '—'}</Text>
+                {week.inWeek ? (
+                  <CountUp
+                    value={Math.round(week.pct * 100)}
+                    suffix="٪"
+                    style={s.heroStatValue}
+                  />
+                ) : (
+                  <Text style={s.heroStatValue}>—</Text>
+                )}
                 <Text style={s.heroStatLabel}>إنجاز</Text>
               </View>
             </View>
@@ -159,10 +357,13 @@ export default function GradesScreen() {
         {/* ===== Quick actions ===== */}
         <Animated.View entering={FadeInDown.delay(120).duration(500)} style={s.actionsBlock}>
           <Text style={s.sectionTitle}>ابدأ بسرعة</Text>
-          <Pressable
+          <LiftPressable
             onPress={startEvaluation}
-            style={({ pressed }) => [s.primaryAction, pressed && { transform: [{ scale: 0.985 }], opacity: 0.92 }]}
-            accessibilityRole="button"
+            lift={2}
+            hoverScale={1.01}
+            pressScale={0.985}
+            shadow={{ opacity: 0.24, hoverOpacity: 0.34, radius: 20, hoverRadius: 30 }}
+            style={s.primaryAction}
             accessibilityLabel="ابدأ تقييماً جديداً"
           >
             <LinearGradient colors={[c.primary, c.primaryHi]} style={StyleSheet.absoluteFill} />
@@ -174,21 +375,25 @@ export default function GradesScreen() {
               <Text style={s.primaryActionSub}>المرحلة ← المقرر ← الدرجات</Text>
             </View>
             <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.85)" />
-          </Pressable>
+          </LiftPressable>
           <View style={s.actionGrid}>
             {ACTIONS.map((a) => (
-              <Pressable
+              <LiftPressable
                 key={a.label}
                 onPress={a.onPress}
-                style={({ pressed }) => [s.actionCard, pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 }]}
-                accessibilityRole="button"
+                lift={2}
+                hoverScale={1.02}
+                pressScale={0.965}
+                shadow={{ opacity: 0.07, hoverOpacity: 0.16, radius: 12, hoverRadius: 22 }}
+                style={s.actionCard}
+                accessibilityLabel={a.label}
               >
-                <View style={[s.actionIconWrap, { backgroundColor: a.tint }]}>
+                <View style={[s.actionIconWrap, { backgroundColor: a.tint, borderColor: a.ink + '1F' }]}>
                   <Ionicons name={a.icon as any} size={19} color={a.ink} />
                 </View>
                 <Text style={s.actionLabel} numberOfLines={1}>{a.label}</Text>
                 <Text style={s.actionSub} numberOfLines={1}>{a.sub}</Text>
-              </Pressable>
+              </LiftPressable>
             ))}
           </View>
         </Animated.View>
@@ -219,46 +424,35 @@ export default function GradesScreen() {
           <Text style={s.sectionTitle}>كيف يعمل التقييم؟</Text>
           <View style={s.stepsRow}>
             {[
-              { n: '١', t: 'اختر المرحلة', d: 'ابتدائي · متوسط', c: c.primary },
-              { n: '٢', t: 'اختر المقرر', d: 'فصل · مقرر · نوع', c: c.brandSecondary },
-              { n: '٣', t: 'قيّم', d: '٥–١٥ بند', c: c.warmInk },
-            ].map((st) => (
-              <View key={st.n} style={[s.stepCard, { borderTopColor: st.c }]}>
-                <Text style={[s.stepNum, { color: st.c }]}>{st.n}</Text>
+              { n: '١', t: 'اختر المرحلة', d: 'ابتدائي · متوسط', c: c.primary, bg: c.primaryBg },
+              { n: '٢', t: 'اختر المقرر', d: 'فصل · مقرر · نوع', c: c.brandSecondary, bg: c.brandSecondaryBg },
+              { n: '٣', t: 'قيّم', d: '٥–١٥ بند', c: c.gold, bg: c.orangeBg },
+            ].map((st, i) => (
+              <Animated.View
+                key={st.n}
+                entering={FadeInDown.delay(320 + i * 70).duration(460)}
+                style={[s.stepCard, { borderTopColor: st.c }]}
+              >
+                <View style={[s.stepNumWrap, { backgroundColor: st.bg }]}>
+                  <Text style={[s.stepNum, { color: st.c }]}>{st.n}</Text>
+                </View>
                 <Text style={s.stepTitle}>{st.t}</Text>
                 <Text style={s.stepDesc}>{st.d}</Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
         </Animated.View>
 
-        {/* ===== المراحل ===== */}
-        <View onLayout={(e) => { stagesY.current = e.nativeEvent.layout.y; }}>
-          <Animated.Text entering={FadeInDown.delay(360).duration(500)} style={s.sectionTitle}>اختر المرحلة</Animated.Text>
-          <View style={{ gap: sp.sm }}>
-            {GRADES.filter((g) => g.id !== 'intermediate1').map((g, i) => {
-              const n1 = subjectsForGrade(g.id, 'term1').length;
-              const n2 = subjectsForGrade(g.id, 'term2').length;
-              const tone = gradeTone(g.id);
-              return (
-                <Animated.View key={g.id} entering={FadeInDown.delay(420 + i * 60).duration(500)}>
-                  <Pressable onPress={() => open(g.id)} style={({ pressed }) => [s.gradeCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]} accessibilityRole="button">
-                    <View style={[s.gradeAccent, { backgroundColor: tone.base }]} />
-                    <View style={[s.gradeIc, { backgroundColor: tone.tint }]}>
-                      <Ionicons name="school-outline" size={18} color={tone.deep} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.gradeName}>{gradeName(g.id)}</Text>
-                      <Text style={s.gradeMeta}>ف١ · {ar(n1)} مقررات · ف٢ · {ar(n2)} مقررات</Text>
-                    </View>
-                    <View style={[s.gradeArrow, { backgroundColor: tone.tint }]}>
-                      <Ionicons name="chevron-back" size={16} color={tone.deep} />
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
-          </View>
+        {/* ===== المراحل — عمود من الأعلى إلى الأسفل ===== */}
+        <View onLayout={(e) => { stagesY.current = e.nativeEvent.layout.y; }} style={s.railBlock}>
+          <Animated.View entering={FadeInDown.delay(360).duration(500)} style={s.railHead}>
+            <Text style={s.sectionTitle}>اختر المرحلة</Text>
+            <View style={s.railHint}>
+              <Ionicons name="layers-outline" size={12} color={c.text4} />
+              <Text style={s.railHintText}>{ar(gradeCards.length)} مراحل</Text>
+            </View>
+          </Animated.View>
+          <GradeStack items={gradeCards} onOpen={openStage} />
         </View>
 
         {/* ===== CTA banner ===== */}
@@ -267,13 +461,20 @@ export default function GradesScreen() {
           <LinearGradient colors={['rgba(0,70,69,0.55)', 'rgba(0,70,69,0.92)']} style={StyleSheet.absoluteFill} />
           <View style={s.ctaBannerContent}>
             <Text style={s.ctaBannerTitle}>جاهز لتقييم إبداعاتك؟</Text>
-            <Text style={s.ctaBannerSub}>ابدأ الآن — ٤ مراحل · {ar(subjectTotal)} مقررات · {ar(CRITERIA_COUNT)} بند</Text>
-            <Pressable onPress={startEvaluation} style={({ pressed }) => [s.ctaBannerBtn, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]} accessibilityRole="button">
+            <Text style={s.ctaBannerSub}>ابدأ الآن — {ar(gradeCards.length)} مراحل · {ar(subjectTotal)} مقررات · {ar(CRITERIA_COUNT)} بند</Text>
+            <LiftPressable
+              onPress={startEvaluation}
+              lift={1.5}
+              hoverScale={1.03}
+              pressScale={0.965}
+              style={s.ctaBannerBtn}
+              accessibilityLabel="ابدأ تقييماً"
+            >
               <LinearGradient colors={[c.primary, c.primaryHi]} style={s.ctaBannerBtnGrad}>
                 <Text style={s.ctaBannerBtnText}>ابدأ تقييماً</Text>
                 <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
               </LinearGradient>
-            </Pressable>
+            </LiftPressable>
           </View>
         </Animated.View>
 
@@ -287,13 +488,13 @@ export default function GradesScreen() {
               { q: 'هل يمكن طباعة الاستمارات؟', a: 'نعم — نماذج A4 (٢١٠×٢٩٧) جاهزة للطباعة من شاشة "نماذج".' },
               { q: 'من يمكنه الدخول؟', a: 'المشرف (admin) والمعلمون (باسمهم وكلمة سرهم) والضيوف (نماذج فقط).' },
             ].map((f, i) => (
-              <Pressable key={i} onPress={() => setOpenFaq(openFaq === i ? null : i)} style={s.faqCard} accessibilityRole="button">
-                <View style={s.faqHead}>
-                  <Text style={s.faqQ}>{f.q}</Text>
-                  <Ionicons name={openFaq === i ? 'chevron-up' : 'chevron-down'} size={16} color={c.primary} />
-                </View>
-                {openFaq === i && <Text style={s.faqA}>{f.a}</Text>}
-              </Pressable>
+              <FaqRow
+                key={i}
+                q={f.q}
+                a={f.a}
+                open={openFaq === i}
+                onToggle={() => setOpenFaq(openFaq === i ? null : i)}
+              />
             ))}
           </View>
         </Animated.View>
@@ -317,13 +518,49 @@ export default function GradesScreen() {
           </View>
         </Animated.View>
 
-        {/* ===== FAB ===== */}
-        <Pressable onPress={startEvaluation} style={s.fab} accessibilityRole="button" accessibilityLabel="ابدأ تقييماً">
-          <LinearGradient colors={[c.primary, c.primaryHi]} style={s.fabGrad}>
-            <Ionicons name="add" size={26} color="#FFFFFF" />
-          </LinearGradient>
-        </Pressable>
-      </ScrollView>
+        {/* ===== FAB — للجوال فقط؛ على سطح المكتب تكفي الإجراءات الظاهرة ===== */}
+        {!isDesktop && (
+          <View style={s.fabWrap} pointerEvents="box-none">
+            <Animated.View pointerEvents="none" style={[s.fabHalo, haloStyle]} />
+            <LiftPressable
+              onPress={startEvaluation}
+              lift={3}
+              hoverScale={1.08}
+              pressScale={0.9}
+              shadow={{ opacity: 0.30, hoverOpacity: 0.42, radius: 18, hoverRadius: 28 }}
+              style={s.fab}
+              accessibilityLabel="ابدأ تقييماً"
+            >
+              <LinearGradient colors={[c.primary, c.primaryHi]} style={s.fabGrad}>
+                <Ionicons name="add" size={26} color="#FFFFFF" />
+              </LinearGradient>
+            </LiftPressable>
+          </View>
+        )}
+      </Animated.ScrollView>
+
+      {/* ===== ترويسة مكثّفة عند التمرير ===== */}
+      <Animated.View pointerEvents="none" style={[s.stickyHead, stickyStyle]}>
+        <View style={s.stickyLogo}>
+          <Text style={s.stickyLogoText}>آ</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.stickyTitle}>لوحة العمل</Text>
+          <Text style={s.stickySub}>أكاديمية آفاق · الفنون البصرية</Text>
+        </View>
+        <View style={s.stickyStat}>
+          <Text style={s.stickyStatValue}>
+            {week.inWeek ? `${ar(Math.round(week.pct * 100))}٪` : '—'}
+          </Text>
+          <Text style={s.stickyStatLabel}>إنجاز الأسبوع</Text>
+        </View>
+      </Animated.View>
+
+      {/* ستارة الانتقال — فوق الترويسة المكثّفة أيضاً */}
+      <Animated.View
+        pointerEvents="none"
+        style={[s.veil, { backgroundColor: veilColor }, veilStyle]}
+      />
     </SafeAreaView>
   );
 }
@@ -332,10 +569,12 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg, overflow: 'hidden' },
   bgPhoto: { position: 'absolute', top: 0, left: 0, right: 0, height: '116%' },
   scroll: { padding: sp.md, paddingBottom: 110, gap: sp.md },
+  scrollDesktop: { width: '100%', padding: sp.lg, paddingBottom: 130, gap: sp.lg, maxWidth: 1100, alignSelf: 'center' },
 
   /* Hero — ارتفاعه حسب محتواه حتى لا تُقصّ صفوف الإحصاء */
   hero: { borderRadius: rad.xl, overflow: 'hidden',
     shadowColor: c.primary, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 28, elevation: 8 },
+  sheen: { position: 'absolute', top: -90, bottom: -90, width: 150 },
   heroContent: { padding: sp.lg, gap: sp.xs },
   heroBrand: { gap: 1 },
   heroEyebrow: { fontFamily: fnt.m, fontSize: 10.5, color: 'rgba(255,255,255,0.9)' },
@@ -350,7 +589,17 @@ const s = StyleSheet.create({
 
   sectionTitle: { fontFamily: fnt.b, fontSize: fs.md, color: c.text, marginTop: sp.sm, marginBottom: 2, paddingHorizontal: 2 },
 
-  /* Quick actions — إجراء أساسي واحد + ثلاث بلاطات بيضاء */
+  railBlock: { gap: sp.sm },
+  railHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  railHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: c.bgAlt, borderRadius: rad.pill,
+    borderWidth: 1, borderColor: c.line,
+    paddingVertical: 3, paddingHorizontal: sp.sm,
+  },
+  railHintText: { fontFamily: fnt.r, fontSize: 10, color: c.text3 },
+
+  /* Quick actions — أيقونة وسطية بهالة لونية كما في بطاقات المعرض */
   actionsBlock: { gap: sp.sm },
   primaryAction: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
     shadowColor: c.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.24, shadowRadius: 20, elevation: 6 },
@@ -358,11 +607,12 @@ const s = StyleSheet.create({
   primaryActionLabel: { fontFamily: fnt.b, fontSize: fs.md, color: '#FFFFFF' },
   primaryActionSub: { fontFamily: fnt.r, fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
   actionGrid: { flexDirection: 'row', gap: sp.sm },
-  actionCard: { flex: 1, backgroundColor: c.tileBg, borderRadius: rad.lg, borderWidth: 1, borderColor: c.line, padding: sp.md, gap: sp.xs,
+  actionCard: { flex: 1, alignItems: 'center', backgroundColor: c.tileBg, borderRadius: rad.xl, borderWidth: 1, borderColor: c.line,
+    paddingVertical: sp.lg, paddingHorizontal: sp.sm, gap: 3,
     shadowColor: c.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2 },
-  actionIconWrap: { width: 36, height: 36, borderRadius: rad.sm, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text },
-  actionSub: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3 },
+  actionIconWrap: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 6, borderWidth: 1 },
+  actionLabel: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text, textAlign: 'center' },
+  actionSub: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3, textAlign: 'center' },
 
   meterRow: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
   meterText: { fontFamily: fnt.m, fontSize: 10, color: c.text3 },
@@ -370,23 +620,16 @@ const s = StyleSheet.create({
   meterFill: { height: '100%', backgroundColor: c.primary, borderRadius: 3 },
   weekEmpty: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.xs },
 
-  /* How it works — ترقيم العربية والرقم على حافة واحدة */
+  /* How it works — رقم داخل بلاطة لونية بدل رقم عائم */
   stepsRow: { flexDirection: 'row', gap: sp.sm },
-  stepCard: { flex: 1, backgroundColor: c.tileBg, borderRadius: rad.md, borderWidth: 1, borderColor: c.tileBorder, borderTopWidth: 3, padding: sp.md, gap: 3,
+  stepCard: { flex: 1, backgroundColor: c.tileBg, borderRadius: rad.xl, borderWidth: 1, borderColor: c.tileBorder, borderTopWidth: 3, padding: sp.md, gap: 3,
     shadowColor: c.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2 },
-  stepNum: { fontFamily: fnt.bk, fontSize: fs.xl, letterSpacing: -0.5, textAlign: 'right' },
+  stepNumWrap: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4, alignSelf: 'flex-start' },
+  stepNum: { fontFamily: fnt.bk, fontSize: fs.md, letterSpacing: -0.5 },
   stepTitle: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text, textAlign: 'right' },
   stepDesc: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3, textAlign: 'right' },
 
-  /* Grade rows — بطاقة بيضاء وشريط بلون المرحلة على حافة السهم */
-  gradeCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
-    backgroundColor: c.tileBg, borderWidth: 1, borderColor: c.line,
-    shadowColor: c.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2 },
-  gradeAccent: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 6, borderTopRightRadius: rad.lg, borderBottomRightRadius: rad.lg },
-  gradeIc: { width: 42, height: 42, borderRadius: rad.md, alignItems: 'center', justifyContent: 'center' },
-  gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
-  gradeMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
-  gradeArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  /* Grade list — البطاقة نفسها في components/grade-stack.tsx */
 
   /* CTA banner */
   ctaBanner: { height: 170, borderRadius: rad.xl, overflow: 'hidden', marginTop: sp.sm,
@@ -399,7 +642,7 @@ const s = StyleSheet.create({
   ctaBannerBtnText: { fontFamily: fnt.b, fontSize: fs.sm, color: '#FFFFFF' },
 
   /* FAQ */
-  faqCard: { backgroundColor: c.tileBg, borderRadius: rad.md, borderWidth: 1, borderColor: c.tileBorder, padding: sp.md, gap: sp.xs },
+  faqCard: { backgroundColor: c.tileBg, borderRadius: rad.md, borderWidth: 1, borderColor: c.tileBorder, padding: sp.md, gap: sp.xs, shadowColor: c.primary, shadowOffset: { width: 0, height: 6 } },
   faqHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: sp.sm },
   faqQ: { fontFamily: fnt.b, fontSize: fs.xs, color: c.text, flex: 1 },
   faqA: { fontFamily: fnt.r, fontSize: fs.xxs, color: c.text2, lineHeight: 17, marginTop: sp.xs },
@@ -414,7 +657,36 @@ const s = StyleSheet.create({
   footerDot: { color: 'rgba(255,255,255,0.5)' },
   footerCopy: { fontFamily: fnt.r, fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: sp.xs },
 
-  /* FAB */
-  fab: { position: 'absolute', bottom: 16, left: sp.md, width: 56, height: 56, borderRadius: 28, overflow: 'hidden', shadowColor: c.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 18, elevation: 8 },
+  /* FAB — الهالة تُرسم خلف الزرّ في الحاوية نفسها */
+  fabWrap: { position: 'absolute', bottom: 16, left: sp.md, width: 56, height: 56 },
+  fabHalo: { position: 'absolute', top: 0, left: 0, width: 56, height: 56, borderRadius: 28, backgroundColor: c.primary },
+  fab: { width: 56, height: 56, borderRadius: 28, overflow: 'hidden', shadowColor: c.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 18, elevation: 8 },
   fabGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  /* ستارة الانتقال بين الصفحات */
+  veil: { ...StyleSheet.absoluteFillObject, zIndex: 40 },
+
+  /* ترويسة التمرير المكثّفة */
+  stickyHead: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    /* ترتيب عربي على الويب: الشعار يميناً والإحصاءة يساراً */
+    flexDirection: Platform.OS === 'web' ? 'row-reverse' : 'row',
+    alignItems: 'center', gap: sp.md,
+    paddingHorizontal: sp.md, paddingVertical: sp.sm,
+    backgroundColor: 'rgba(250,250,250,0.97)',
+    borderBottomWidth: 1, borderBottomColor: c.line,
+    shadowColor: c.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08, shadowRadius: 14, elevation: 4,
+    zIndex: 10,
+  },
+  stickyLogo: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  stickyLogoText: { fontFamily: fnt.b, fontSize: 15, color: '#FFFFFF' },
+  stickyTitle: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
+  stickySub: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3, marginTop: 1 },
+  stickyStat: { alignItems: 'flex-end' },
+  stickyStatValue: { fontFamily: fnt.bk, fontSize: fs.md, color: c.primary },
+  stickyStatLabel: { fontFamily: fnt.r, fontSize: 9, color: c.text3 },
 });

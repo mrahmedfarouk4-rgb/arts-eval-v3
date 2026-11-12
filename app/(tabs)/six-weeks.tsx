@@ -1,16 +1,21 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator,
-} from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { arabicDigits } from '@/components/count-up';
+import { GradeStack, type GradeCardItem } from '@/components/grade-stack';
+import { useToneVeil } from '@/components/motion';
+import { PageHero, SectionHead } from '@/components/page-hero';
+import { Empty, Stat } from '@/components/pro-ui';
+import { BRAND_TONE, c, fnt, fs, gradeTone, rad, sh, sp } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
 import { GRADES, gradeName, type GradeId } from '@/constants/criteria';
-import { c, sp, rad, fnt, fs, gradeTone } from '@/constants/brand';
-import { BrandBar, Banner, Stat, Empty, Badge } from '@/components/pro-ui';
-import { listStudents, type Student } from '@/lib/store';
+import { visibleGrades } from '@/lib/accounts';
+import { useAuth } from '@/lib/auth';
 import { listSixWeekReports, type SixWeekReport } from '@/lib/six-week';
+import { listStudents, type Student } from '@/lib/store';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 /**
  * الخطوة ١ من ٢ لتقرير الستة أسابيع — المرحلة الدراسية.
@@ -21,9 +26,16 @@ const ACTIVE_GRADES = GRADES.filter((g) => g.id !== 'intermediate1');
 
 export default function SixWeeksScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [reports, setReports] = useState<SixWeekReport[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /** المراحل المسندة لهذا الحساب — المعلم لا يرى غيرها */
+  const grades = useMemo(() => {
+    const allowed = new Set<string>(visibleGrades(user, ACTIVE_GRADES.map((g) => g.id)));
+    return ACTIVE_GRADES.filter((g) => allowed.has(g.id));
+  }, [user]);
 
   const load = useCallback(async () => {
     try {
@@ -54,10 +66,40 @@ export default function SixWeeksScreen() {
     return acc;
   }, [students, reports]);
 
+  /** بطاقات الغلاف — نفس بيانات القائمة السابقة لكن بقراءة مجلّة */
+  const covers = useMemo<GradeCardItem[]>(
+    () => grades.map((g) => {
+      const n = counts[g.id];
+      return {
+        id: g.id,
+        title: gradeName(g.id),
+        kicker: 'تقرير الستة أسابيع',
+        meta: [`${arabicDigits(n.students)} طالب`, `${arabicDigits(n.reports)} تقرير`],
+        badge: n.reports,
+      };
+    }),
+    [counts, grades]
+  );
+
+  /** ستارة بلون المرحلة قبل فتح لائحة الطلاب */
+  const { run: veilRun, style: veilStyle, color: veilColor, reset: veilReset } = useToneVeil(rad.xl);
+  useFocusEffect(useCallback(() => { veilReset(); }, [veilReset]));
+
+  const openStage = (id: string) =>
+    veilRun(gradeTone(id).deep, () => openGrade(id as GradeId));
+
   if (loading) {
     return (
       <SafeAreaView style={s.root} edges={['top']}>
-        <BrandBar title="تقرير الستة أسابيع" sub="الخطوة ١ من ٢ · المرحلة الدراسية" />
+        <View style={{ padding: sp.lg }}>
+          <PageHero
+            tone={BRAND_TONE}
+            eyebrow="الخطوة ١ من ٢ · المرحلة الدراسية"
+            title="تقرير الستة أسابيع"
+            sub="تقييم وصفي بلا درجات"
+            compact
+          />
+        </View>
         <View style={s.loading}>
           <ActivityIndicator color={c.primary} />
         </View>
@@ -71,13 +113,15 @@ export default function SixWeeksScreen() {
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
-      <BrandBar title="تقرير الستة أسابيع" sub="الخطوة ١ من ٢ · المرحلة الدراسية" />
-
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <Banner
-          level="info"
-          title="تقييم وصفي بلا درجات"
-          message="اختر المرحلة ثم الطالب لإنشاء التقرير أو متابعة تقاريره المحفوظة."
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <PageHero
+          tone={BRAND_TONE}
+          eyebrow="الخطوة ١ من ٢ · المرحلة الدراسية"
+          title="تقرير الستة أسابيع"
+          sub="تقييم وصفي بلا درجات · اختر المرحلة ثم الطالب لإنشاء التقرير أو متابعة تقاريره المحفوظة."
         />
 
         <View style={s.statBar}>
@@ -103,84 +147,54 @@ export default function SixWeeksScreen() {
             }
           />
         ) : (
-          <View style={{ gap: sp.sm }}>
-            <Text style={s.sectionTitle}>اختر المرحلة</Text>
-            {ACTIVE_GRADES.map((g, i) => {
-              const tone = gradeTone(g.id);
-              const n = counts[g.id];
-              return (
-                <Animated.View key={g.id} entering={FadeInDown.delay(80 + i * 60).duration(450)}>
-                  <Pressable
-                    onPress={() => openGrade(g.id)}
-                    style={({ pressed }) => [
-                      s.gradeCard,
-                      pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${gradeName(g.id)} — ${n.students} طالب · ${n.reports} تقرير`}
-                  >
-                    <View style={[s.gradeAccent, { backgroundColor: tone.base }]} />
-                    <View style={[s.gradeIc, { backgroundColor: tone.tint }]}>
-                      <Ionicons name="school-outline" size={18} color={tone.deep} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.gradeName} numberOfLines={1}>
-                        {gradeName(g.id)}
-                      </Text>
-                      <Text style={s.gradeMeta}>
-                        {n.students} طالب · {n.reports} تقرير
-                      </Text>
-                    </View>
-                    {n.reports > 0 && (
-                      <Badge label={`${n.reports}`} color={tone.onBase} bg={tone.base} />
-                    )}
-                    <View style={[s.gradeArrow, { backgroundColor: tone.tint }]}>
-                      <Ionicons name="chevron-back" size={16} color={tone.deep} />
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
-          </View>
+          <>
+            <SectionHead
+              title="اختر المرحلة"
+              hint="اضغط بطاقة المرحلة لعرض طلابها وتقاريرهم"
+              count={`${arabicDigits(covers.length)} مراحل`}
+              tone={BRAND_TONE}
+            />
+
+            <GradeStack items={covers} onOpen={openStage} />
+          </>
         )}
       </ScrollView>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: veilColor, zIndex: 40 }, veilStyle]}
+      />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
-  scroll: { padding: sp.lg, paddingBottom: sp.xxl, gap: sp.md },
+  scroll: { ...contentColumn, padding: sp.lg, paddingBottom: sp.xxl, gap: sp.md },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   statBar: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: c.bgAlt,
     borderRadius: rad.lg, borderWidth: 1, borderColor: c.line,
-    paddingVertical: sp.md },
+    paddingVertical: sp.md, ...sh.sm },
   vRule: { width: 1, height: 26, backgroundColor: c.line },
 
   sectionTitle: {
     fontFamily: fnt.b, fontSize: fs.md, color: c.text,
     marginTop: sp.sm, marginBottom: 2, paddingHorizontal: 2 },
 
-  gradeCard: {
-    flexDirection: 'row', alignItems: 'center', gap: sp.md,
-    borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
-    backgroundColor: c.tileBg, borderWidth: 1, borderColor: c.line,
-    shadowColor: c.primary, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07, shadowRadius: 12, elevation: 2 },
-  gradeAccent: {
-    position: 'absolute', right: 0, top: 0, bottom: 0, width: 6,
-    borderTopRightRadius: rad.lg, borderBottomRightRadius: rad.lg },
-  gradeIc: {
-    width: 42, height: 42, borderRadius: rad.md,
-    alignItems: 'center', justifyContent: 'center' },
-  gradeName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
-  gradeMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
-  gradeArrow: {
-    width: 30, height: 30, borderRadius: 15,
-    alignItems: 'center', justifyContent: 'center' },
+  railHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: sp.sm, paddingHorizontal: 2,
+  },
+  railHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: c.bgAlt, borderRadius: rad.pill,
+    borderWidth: 1, borderColor: c.line,
+    paddingVertical: 3, paddingHorizontal: sp.sm,
+  },
+  railHintText: { fontFamily: fnt.r, fontSize: 10, color: c.text3 },
 
   changeBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,

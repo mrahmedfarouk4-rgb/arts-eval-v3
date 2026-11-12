@@ -8,6 +8,8 @@
  *     يقاسمها الجميع. (سابقاً كانت المعلمين يتقاسمون كلمة واحدة.)
  *   • لكل حساب **مقررات مسندة** — المعلم لا يرى في التقييم إلا مقرراته.
  *     المشرف يرى كل المقررات.
+ *   • ولكل حساب **مراحل مسندة** — المعلم لا يرى في لوحة العمل إلا الصفوف
+ *     التي أسندها إليه المشرف. بلا إسناد يرى الكل (توافق الحسابات القديمة).
  *
  * ⚠ كلمة المرور الافتراضية `admin` تسافر مع التطبيق، فمن ملك نسخة APK
  *   يستطيع فتح لوحة المشرف. لذلك تُعرض تحذير ثابت في الإعدادات حتى
@@ -16,7 +18,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sha256Hex } from '@/lib/sha256';
-import type { SubjectId } from '@/constants/criteria';
+import type { GradeId, SubjectId } from '@/constants/criteria';
 
 const K_ACCOUNTS = '@v2/accounts';
 const K_SESSION = '@v2/auth';
@@ -45,6 +47,11 @@ export interface Account {
   pwHash: string;
   /** المقررات المسندة — المعلم لا يرى غيرها. المشرف يتجاوز هذا الحد. */
   subjectIds: SubjectId[];
+  /**
+   * المراحل (الصفوف) المسندة — المعلم لا يرى غيرها في لوحة العمل.
+   * مصفوفة فارغة = كل المراحل (توافق الحسابات التي سبقت هذا الخيار).
+   */
+  gradeIds?: GradeId[];
   createdAt: string;
   /**
    * آخر تعديل — تعتمد عليه المزامنة: الأحدث يفوز عند التعارض بين الأجهزة.
@@ -109,6 +116,7 @@ function migrate(f: AccountsFile): AccountsFile {
 
   const accounts = f.accounts.map((a) => {
     const subjectIds: SubjectId[] = Array.isArray(a.subjectIds) ? a.subjectIds : [];
+    const gradeIds: GradeId[] = Array.isArray(a.gradeIds) ? a.gradeIds : [];
     let pwHash = a.pwHash ?? '';
 
     if (!pwHash) {
@@ -117,8 +125,9 @@ function migrate(f: AccountsFile): AccountsFile {
     }
     if (pwHash !== (a.pwHash ?? '')) changed = true;
     if (subjectIds !== a.subjectIds) changed = true;
+    if (gradeIds !== a.gradeIds) changed = true;
 
-    return { ...a, pwHash, subjectIds };
+    return { ...a, pwHash, subjectIds, gradeIds };
   });
 
   return changed ? { ...f, accounts } : f;
@@ -134,6 +143,7 @@ function seedAdmin(): AccountsFile {
     enabled: true,
     pwHash: hashPassword(DEFAULT_ADMIN.password),
     subjectIds: [],
+    gradeIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     seeded: true,
@@ -226,6 +236,24 @@ export function visibleSubjects(
   return all.filter((id) => set.has(id));
 }
 
+/**
+ * المراحل التي يراها هذا الحساب — المشرف والزائر يريان الكل.
+ * المعلم بلا مراحل مسندة يرى الكل أيضاً، حتى لا يختفي التطبيق عن
+ * الحسابات التي أُنشئت قبل إضافة هذا الخيار. بمجرّد إسناد مرحلة
+ * واحدة يُقصَر على ما أُسند فقط.
+ */
+export function visibleGrades(
+  account: { role: Role; gradeIds?: GradeId[] } | null,
+  all: GradeId[]
+): GradeId[] {
+  if (!account) return all;
+  if (account.role === 'admin') return all;
+  const assigned = account.gradeIds ?? [];
+  if (!assigned.length) return all;
+  const set = new Set(assigned);
+  return all.filter((id) => set.has(id));
+}
+
 /* ------------------------------------------------------------------ */
 /*  إدارة الحسابات                                                    */
 /* ------------------------------------------------------------------ */
@@ -244,6 +272,8 @@ export async function addAccount(input: {
   name: string;
   role: Role;
   subjectIds: SubjectId[];
+  /** المراحل المسندة — فارغة = كل المراحل */
+  gradeIds?: GradeId[];
   /** كلمة سره الأولى — بلاها لا يستطيع الدخول */
   password?: string;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -269,6 +299,7 @@ export async function addAccount(input: {
     enabled: true,
     pwHash: hashPassword(input.password),
     subjectIds: input.subjectIds ?? [],
+    gradeIds: input.gradeIds ?? [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
@@ -278,7 +309,7 @@ export async function addAccount(input: {
 
 export async function updateAccount(
   id: string,
-  patch: Partial<Pick<Account, 'username' | 'name' | 'role' | 'enabled' | 'subjectIds'>>
+  patch: Partial<Pick<Account, 'username' | 'name' | 'role' | 'enabled' | 'subjectIds' | 'gradeIds'>>
 ): Promise<{ ok: boolean; error?: string }> {
   const f = await load();
   const i = f.accounts.findIndex((a) => a.id === id);
@@ -348,6 +379,7 @@ export async function mergeAccountsFromRemote(remote: Account[]): Promise<number
     enabled: r.enabled !== false,
     pwHash: r.pwHash || '',
     subjectIds: Array.isArray(r.subjectIds) ? r.subjectIds : [],
+    gradeIds: Array.isArray(r.gradeIds) ? r.gradeIds : [],
     createdAt: r.createdAt || new Date().toISOString(),
     updatedAt: r.updatedAt || r.createdAt || new Date().toISOString(),
     seeded: false,
@@ -501,7 +533,14 @@ export async function authenticate(
 
   if (hashPassword(password) !== expected) return { ok: false, reason: 'wrong-password' };
 
-  return { ok: true, account: { ...acc, subjectIds: acc.subjectIds ?? [] } };
+  return {
+    ok: true,
+    account: {
+      ...acc,
+      subjectIds: acc.subjectIds ?? [],
+      gradeIds: acc.gradeIds ?? [],
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -514,6 +553,7 @@ export interface SessionData {
   name: string;
   role: Role;
   subjectIds: SubjectId[];
+  gradeIds: GradeId[];
   at: string;
 }
 
@@ -524,6 +564,7 @@ export async function persistSession(account: Account): Promise<void> {
     name: account.name,
     role: account.role,
     subjectIds: account.subjectIds ?? [],
+    gradeIds: account.gradeIds ?? [],
     at: new Date().toISOString(),
   };
   await AsyncStorage.setItem(K_SESSION, JSON.stringify(s));
@@ -536,11 +577,29 @@ export async function readSession(): Promise<SessionData | null> {
     const s = JSON.parse(raw) as SessionData;
     if (!s?.accountId) return null;
 
-    const acc = (await load()).accounts.find((a) => a.id === s.accountId);
+    const file = await load();
+    /**
+     * البحث بالمعرّف أولاً، وإن لم يوجد فباسم المستخدم: تكرار صفوف
+     * الحساب نفسه في السحابة قد يغيّر المعرّف بعد الدمج، ولا نريد
+     * إخراج المستخدم من جلسته لهذا السبب. لا نطبّق البديل إلا إذا
+     * كان هناك حساب واحد فقط بهذا الاسم — حتى لا نلتبس بحساب آخر.
+     */
+    let acc = file.accounts.find((a) => a.id === s.accountId);
+    if (!acc) {
+      const same = file.accounts.filter((a) => a.username === s.username && !a.deleted);
+      if (same.length === 1) acc = same[0];
+    }
     // إن حُذف الحساب أو عُطّل بعد تسجيل الدخول نُنهي الجلسة
     if (!acc || !acc.enabled || acc.deleted) {
       await AsyncStorage.removeItem(K_SESSION);
       return null;
+    }
+    if (acc.id !== s.accountId) {
+      // نُثبّت المعرّف الجديد كي لا يتكرر البحث في كل تشغيل
+      await AsyncStorage.setItem(
+        K_SESSION,
+        JSON.stringify({ ...s, accountId: acc.id, subjectIds: acc.subjectIds ?? [], gradeIds: acc.gradeIds ?? [] })
+      );
     }
     // نُبقي الاسم والمقررات محدَّثة — عدّلها المشرف بعد الدخول
     return {
@@ -549,6 +608,7 @@ export async function readSession(): Promise<SessionData | null> {
       name: acc.name,
       role: acc.role,
       subjectIds: acc.subjectIds ?? [],
+      gradeIds: acc.gradeIds ?? [],
       at: s.at,
     };
   } catch {

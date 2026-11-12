@@ -8,8 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GRADES, gradeName, type GradeId } from '@/constants/criteria';
 import { c, sp, rad, fnt, fs } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
 import { Button, Card, Badge, Banner, Section, TopBar } from '@/components/pro-ui';
 import { useSession } from '@/lib/session';
+import { useAuth } from '@/lib/auth';
+import { visibleGrades } from '@/lib/accounts';
 import { confirmAction } from '@/lib/dialog';
 import { listStudents, type Student } from '@/lib/store';
 import { emitHtml } from '@/lib/print-client';
@@ -202,6 +205,7 @@ export default function SixWeekReportScreen() {
   const paramStudentName = first(params.studentName);
   const paramGradeId = first(params.gradeId);
   const { teacherName, term } = useSession();
+  const { user } = useAuth();
 
   const [reportId, setReportId] = useState<string | null>(paramId ?? null);
   const [loaded, setLoaded] = useState(!paramId);
@@ -235,10 +239,12 @@ export default function SixWeekReportScreen() {
     let alive = true;
     (async () => {
       const list = await listStudents();
-      if (alive) setStudents(list);
+      // الطلاب داخل المراحل المسندة فقط — المعلم لا يرى غيره
+      const allowed = new Set<string>(visibleGrades(user, GRADES.map((g) => g.id) as GradeId[]));
+      if (alive) setStudents(list.filter((st) => !!st.grade_id && allowed.has(st.grade_id)));
     })();
     return () => { alive = false; };
-  }, []);
+  }, [user]);
 
   /** بدء تقرير من صف طالب: نستكمل الاسم والصف من سجل الطلاب إن لم يُمررا */
   useEffect(() => {
@@ -796,7 +802,7 @@ export default function SixWeekReportScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { padding: sp.lg, paddingBottom: sp.xxl, gap: sp.md },
+  scroll: { ...contentColumn, padding: sp.lg, paddingBottom: sp.xxl, gap: sp.md },
 
   studentRow: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
   studentIcon: {

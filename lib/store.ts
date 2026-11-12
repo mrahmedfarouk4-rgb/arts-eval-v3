@@ -998,7 +998,7 @@ const EVALUATION_COLUMNS = [
   'planned', 'unit',
 ];
 const ACCOUNT_COLUMNS = [
-  'id', 'username', 'name', 'role', 'enabled', 'pw_hash', 'subject_ids',
+  'id', 'username', 'name', 'role', 'enabled', 'pw_hash', 'subject_ids', 'grade_ids',
   'created_at', 'updated_at', 'deleted',
 ];
 
@@ -1061,6 +1061,7 @@ function accountRow(a: Account): Record<string, unknown> {
       enabled: a.enabled ?? true,
       pw_hash: a.pwHash ?? '',
       subject_ids: a.subjectIds ?? [],
+      grade_ids: a.gradeIds ?? [],
       created_at: a.createdAt || new Date().toISOString(),
       updated_at: a.updatedAt || a.createdAt || new Date().toISOString(),
       deleted: a.deleted === true,
@@ -1079,6 +1080,7 @@ function accountFromRow(r: Record<string, unknown>): Account {
     enabled: r.enabled !== false,
     pwHash: String(r.pw_hash ?? ''),
     subjectIds: Array.isArray(r.subject_ids) ? (r.subject_ids as Account['subjectIds']) : [],
+    gradeIds: Array.isArray(r.grade_ids) ? (r.grade_ids as Account['gradeIds']) : [],
     createdAt: String(r.created_at ?? new Date().toISOString()),
     updatedAt: r.updated_at ? String(r.updated_at) : undefined,
     deleted: r.deleted === true,
@@ -1110,6 +1112,30 @@ export async function syncAccounts(timeoutMs = 10000): Promise<{ ok: boolean; er
     return await Promise.race([work, timeout]);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'خطأ غير معروف' };
+  }
+}
+
+/**
+ * تنظيف صفوف الحسابات المكرّرة في السحابة.
+ * ---------------------------------------------------------------------------
+ * كل جهاز يُزرع فيه المشرف الافتراضي بمعرّف محلي مختلف، فيصل صف جديد
+ * إلى السحابة بنفس اسم الدخول رغم أن الحساب واحد. بعد الدمج يصبح في
+ * الجهاز صف واحد، لكن السحابة تحتفظ بالبقية فتتراكم مع كل جهاز جديد.
+ * هنا نُبقي صف الحساب المحلي ونحذف أي صف آخر بنفس اسم الدخول.
+ */
+async function pruneDuplicateAccounts(
+  sb: NonNullable<ReturnType<typeof initSupabase>>,
+  local: Account[]
+): Promise<void> {
+  if (!local.length) return;
+  const keep = new Map(local.map((a) => [a.username.trim().toLowerCase(), a.id]));
+  const { data } = await sb.from('accounts').select('id, username');
+  const rows = (data ?? []) as { id: string; username: string | null }[];
+  for (const r of rows) {
+    const key = String(r.username ?? '').trim().toLowerCase();
+    if (keep.has(key) && keep.get(key) !== r.id) {
+      await sb.from('accounts').delete().eq('id', r.id);
+    }
   }
 }
 
@@ -1185,6 +1211,7 @@ export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> 
       if (error) failures.push(`accounts: ${error.message}`);
       else pushed++;
     }
+    await pruneDuplicateAccounts(sb, localAccounts);
 
     // السحب
     const { data: rStudents } = await sb.from('students').select('*');
@@ -1265,11 +1292,14 @@ export async function uploadAll(): Promise<SyncResult> {
       else pushed += group.length;
     }
 
-    for (const group of chunk(await allAccountsIncludingDeleted(), 100)) {
+    // الحسابات المزروعة محلياً (المشرف الافتراضي) لا تُرفع أبداً — كلمة سره معروفة
+    const accounts = (await allAccountsIncludingDeleted()).filter((a) => !a.seeded);
+    for (const group of chunk(accounts, 100)) {
       const { error } = await sb.from('accounts').upsert(group.map(accountRow));
       if (error) failures.push(`accounts: ${error.message}`);
       else pushed += group.length;
     }
+    await pruneDuplicateAccounts(sb, accounts);
 
     const uniqueFailures = [...new Set(failures)];
     return {

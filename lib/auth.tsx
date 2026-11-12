@@ -15,7 +15,7 @@ import {
   type AuthFailure, type Role,
 } from '@/lib/accounts';
 import { syncAccounts } from '@/lib/store';
-import type { SubjectId } from '@/constants/criteria';
+import type { GradeId, SubjectId } from '@/constants/criteria';
 
 // مُعاد التصدير: الجلسة تحتاج قراءة الحساب المحفوظ لتملأ «اسم المعلم»
 export { readSession } from '@/lib/accounts';
@@ -31,6 +31,8 @@ export interface AuthUser {
   role: Role;
   /** المقررات المسندة — المشرف،规范 فارغاً ويرى الكل */
   subjectIds: SubjectId[];
+  /** المراحل المسندة — فارغة = كل المراحل */
+  gradeIds: GradeId[];
   at: string;
 }
 
@@ -104,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: r.account.name,
       role: r.account.role,
       subjectIds: r.account.subjectIds ?? [],
+      gradeIds: r.account.gradeIds ?? [],
       at: new Date().toISOString(),
     };
     await persistSession(r.account);

@@ -76,6 +76,7 @@ create table if not exists public.accounts (
   enabled     boolean     not null default true,
   pw_hash     text        not null default '',
   subject_ids jsonb       not null default '[]'::jsonb,
+  grade_ids   jsonb       not null default '[]'::jsonb,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   deleted     boolean     not null default false

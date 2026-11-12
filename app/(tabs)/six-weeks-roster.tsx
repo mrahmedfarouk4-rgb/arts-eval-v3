@@ -5,8 +5,12 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GRADES, gradeName } from '@/constants/criteria';
-import { c, sp, rad, fnt, fs } from '@/constants/brand';
+import { GRADES, gradeName, type GradeId } from '@/constants/criteria';
+import { visibleGrades } from '@/lib/accounts';
+import { useAuth } from '@/lib/auth';
+import { BRAND_TONE, c, sp, rad, fnt, fs, gradeTone, sh } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
+import { PageHero, SectionHead } from '@/components/page-hero';
 import { Button, Card, Badge, BrandBar, Empty, Stat } from '@/components/pro-ui';
 import { confirmAction } from '@/lib/dialog';
 import { emitHtml } from '@/lib/print-client';
@@ -28,7 +32,11 @@ export default function SixWeekRosterScreen() {
   const { editMode } = useSession();
   const raw = useLocalSearchParams<{ gradeId?: string | string[] }>();
   const param = Array.isArray(raw.gradeId) ? raw.gradeId[0] : raw.gradeId;
-  const gradeId = GRADES.find((g) => g.id === param)?.id ?? null;
+  const { user } = useAuth();
+  const found = GRADES.find((g) => g.id === param)?.id ?? null;
+  const allowed = visibleGrades(user, GRADES.map((g) => g.id) as GradeId[]);
+  const gradeId = found && allowed.includes(found) ? found : null;
+  const tone = gradeId ? gradeTone(gradeId) : BRAND_TONE;
 
   const [students, setStudents] = useState<Student[]>([]);
   const [reports, setReports] = useState<SixWeekReport[]>([]);
@@ -116,17 +124,19 @@ export default function SixWeekRosterScreen() {
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
-      <BrandBar
-        title={gradeName(gradeId)}
-        sub="الخطوة ٢ من ٢ · الطلاب"
-        onBack={() => router.back()}
-      />
-
       <ScrollView
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <PageHero
+          tone={tone}
+          eyebrow="الخطوة ٢ من ٢ · الطلاب"
+          title={gradeName(gradeId)}
+          sub="تقرير الستة أسابيع — أنشئ تقريراً لكل طالب أو تابع المحفوظ"
+          onBack={() => router.back()}
+        />
+
         <View style={s.statBar}>
           <Stat value={students.length} label="طالب" />
           <View style={s.vRule} />
@@ -148,6 +158,15 @@ export default function SixWeekRosterScreen() {
             </Pressable>
           )}
         </View>
+
+        {!loading && filtered.length > 0 && (
+          <SectionHead
+            title="الطلاب"
+            hint="اضغط طالباً لعرض تقاريره المحفوظة"
+            count={filtered.length}
+            tone={tone}
+          />
+        )}
 
         {loading ? (
           <View style={s.loading}>
@@ -290,13 +309,13 @@ export default function SixWeekRosterScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
-  scroll: { paddingHorizontal: sp.lg, paddingTop: sp.lg, paddingBottom: sp.xxl, gap: sp.lg },
+  scroll: { ...contentColumn, paddingHorizontal: sp.lg, paddingTop: sp.lg, paddingBottom: sp.xxl, gap: sp.lg },
 
   statBar: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: c.bgAlt,
     borderRadius: rad.lg, borderWidth: 1, borderColor: c.line,
-    paddingVertical: sp.md },
+    paddingVertical: sp.md, ...sh.sm },
   vRule: { width: 1, height: 26, backgroundColor: c.line },
 
   search: {

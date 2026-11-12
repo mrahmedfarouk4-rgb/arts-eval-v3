@@ -1,30 +1,49 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useToneVeil } from '@/components/motion';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, TextInput,
-  Image,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  FadeInDown, FadeIn, ZoomIn, Easing, Extrapolation,
-  useSharedValue, useAnimatedStyle,
-  withSpring, withTiming, withSequence,
-  interpolate, interpolateColor,
-} from 'react-native-reanimated';
-import {
-  TERMS,
-  subjectsForGrade, gradeName, subjectName,
-  type SubjectId,
-} from '@/constants/criteria';
-import {
-  c, sp, rad, fnt, fs, gradeTone, subjectTone,
-  type GradeTone,
+    c,
+    fnt, fs, gradeTone, subjectTone,
+    rad,
+    sp,
+    type GradeTone,
 } from '@/constants/brand';
-import { useSession } from '@/lib/session';
+import { contentColumn } from '@/constants/layout';
+import {
+    GRADES,
+    TERMS,
+    gradeName,
+    subjectName,
+    subjectsForGrade,
+    type GradeId,
+    type SubjectId,
+} from '@/constants/criteria';
+import { visibleGrades, visibleSubjects } from '@/lib/accounts';
 import { useAuth } from '@/lib/auth';
-import { visibleSubjects } from '@/lib/accounts';
+import { useSession } from '@/lib/session';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    Image,
+    Pressable, ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
+import Animated, {
+    Easing, Extrapolation,
+    FadeIn,
+    FadeInDown,
+    ZoomIn,
+    interpolate, interpolateColor,
+    useAnimatedStyle,
+    useReducedMotion,
+    useSharedValue,
+    withSequence,
+    withSpring, withTiming,
+} from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 /**
  * لون ثانوي مقروء فوق تدرّج الهيرو. نرفع تعبئة الحبر قليلاً عن
@@ -65,6 +84,7 @@ function TermCard({
   onPress: () => void;
 }) {
   const press = useSharedValue(0);
+  const hover = useSharedValue(0);
   const sel = useSharedValue(on ? 1 : 0);
   const pulse = useSharedValue(1);
   const wasOn = useRef(on);
@@ -88,13 +108,20 @@ function TermCard({
       { perspective: 700 },
       { rotateX: `${interpolate(press.value, [0, 1], [0, 5])}deg` },
       { rotateY: `${interpolate(press.value, [0, 1], [0, -4])}deg` },
-      { translateY: interpolate(press.value, [0, 1], [0, 2]) },
-      { scale: pulse.value * interpolate(press.value, [0, 1], [1, 0.97]) },
+      { translateY: interpolate(press.value, [0, 1], [0, 2]) - hover.value * 3 },
+      {
+        scale: pulse.value
+          * interpolate(press.value, [0, 1], [1, 0.97])
+          * interpolate(hover.value, [0, 1], [1, 1.012]),
+      },
     ],
     shadowOpacity:
       interpolate(sel.value, [0, 1], [0.07, 0.4], Extrapolation.CLAMP)
-      * interpolate(press.value, [0, 1], [1, 0.45]),
-    shadowRadius: interpolate(sel.value, [0, 1], [9, 19], Extrapolation.CLAMP),
+      * interpolate(press.value, [0, 1], [1, 0.45])
+      + hover.value * 0.05,
+    shadowRadius:
+      interpolate(sel.value, [0, 1], [9, 19], Extrapolation.CLAMP)
+      + hover.value * 4,
   }));
 
   const selectedFill = useAnimatedStyle(() => ({ opacity: sel.value }));
@@ -114,6 +141,12 @@ function TermCard({
     >
       <Pressable
         onPress={onPress}
+        onHoverIn={() => {
+          hover.value = withSpring(1, { damping: 20, stiffness: 220 });
+        }}
+        onHoverOut={() => {
+          hover.value = withSpring(0, { damping: 20, stiffness: 220 });
+        }}
         onPressIn={() => {
           press.value = withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) });
         }}
@@ -142,13 +175,15 @@ function TermCard({
             end={{ x: 0, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[s.termOrb, { backgroundColor: tone.glow }]} />
-          <View style={[s.termSheen, { backgroundColor: tone.onBase + '12' }]} />
+          <View style={[s.termOrb, { backgroundColor: tone.glow, opacity: 0.25 }]} />
+          <View style={[s.termSheen, { backgroundColor: tone.onBase + '0A' }]} />
         </Animated.View>
 
-        <Animated.Text style={[s.termText, titleStyle]}>{name}</Animated.Text>
-        <View style={s.termSubRow}>
-          <Animated.Text style={[s.termSub, subStyle]}>{sub}</Animated.Text>
+        <View style={s.termTop}>
+          <View style={[s.termIc, { backgroundColor: on ? tone.onBase + '22' : tone.base + '14' }]}>
+            <Ionicons name="calendar-outline" size={14} color={on ? tone.onBase : tone.base} />
+          </View>
+          <Animated.Text style={[s.termText, titleStyle]}>{name}</Animated.Text>
           {on && (
             <Animated.View
               entering={ZoomIn.duration(210)}
@@ -161,82 +196,8 @@ function TermCard({
             </Animated.View>
           )}
         </View>
-      </Pressable>
-    </Animated.View>
-  );
-}
-
-/**
- * بطاقة المقرر — سطح عائم بظل ملوّن من حبر المقرر، وبلاطة أيقونة متدرجة،
- * وميلان 3D عند الضغط يوحي بأن البطاقة تُرفع ثم تعود.
- */
-function SubjectCard({
-  sid, index, onPress,
-}: {
-  sid: SubjectId;
-  index: number;
-  onPress: () => void;
-}) {
-  const st = subjectTone(sid);
-  const press = useSharedValue(0);
-
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [
-      { perspective: 900 },
-      { translateY: interpolate(press.value, [0, 1], [0, -3]) },
-      { rotateX: `${interpolate(press.value, [0, 1], [0, 5])}deg` },
-      { rotateY: `${interpolate(press.value, [0, 1], [0, 3.5])}deg` },
-      { scale: interpolate(press.value, [0, 1], [1, 0.985]) },
-    ],
-    shadowOpacity: interpolate(press.value, [0, 1], [0.26, 0.1], Extrapolation.CLAMP),
-    shadowRadius: interpolate(press.value, [0, 1], [18, 9], Extrapolation.CLAMP),
-  }));
-
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(340 + index * 50).duration(460)}
-      style={[s.subjectWrap, { shadowColor: st.ink }, cardStyle]}
-    >
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => {
-          press.value = withTiming(1, { duration: 130, easing: Easing.out(Easing.quad) });
-        }}
-        onPressOut={() => {
-          press.value = withSpring(0, { damping: 14, stiffness: 260 });
-        }}
-        style={s.subjectCard}
-        accessibilityRole="button"
-        accessibilityLabel={`${subjectName(sid)} — جاهز للتقييم`}
-      >
-        <LinearGradient
-          colors={[st.ink + '1A', 'rgba(255,255,255,0)', '#FFFFFF']}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient colors={[st.base, st.ink]} style={s.subjectAccent} />
-
-        <View style={[s.subjectIc, { borderColor: st.ink + '1F' }]}>
-          <LinearGradient
-            colors={[st.ink + '22', st.ink + '0A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Ionicons name="book-outline" size={18} color={st.ink} />
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text style={s.subjectName}>{subjectName(sid)}</Text>
-          <Text style={s.subjectMeta}>جاهز للتقييم</Text>
-        </View>
-
-        <View style={[s.subjectArrowLeft, {
-          backgroundColor: st.ink + '12',
-          borderColor: st.ink + '1A',
-        }]}>
-          <Ionicons name="chevron-back" size={16} color={st.ink} />
+        <View style={s.termSubRow}>
+          <Animated.Text style={[s.termSub, subStyle]}>{sub}</Animated.Text>
         </View>
       </Pressable>
     </Animated.View>
@@ -248,10 +209,33 @@ export default function TermScreen() {
   const { user } = useAuth();
   const {
     gradeId, term, setTerm, setSubject,
-    teacherName, setTeacherName } = useSession();
+    teacherName, setTeacherName, resetFlow } = useSession();
 
   const [teacherDraft, setTeacherDraft] = useState(teacherName ?? '');
   const [teacherMissing, setTeacherMissing] = useState(false);
+
+  /**
+   * تكبير خفيف عند الدخول (1.045 ← 1) — يوحي بأن بطاقة المرحلة
+   * الملموسة هي التي تمدّدت إلى هذا الهيرو، بلا واجهة مشاركة عناصر
+   * تجريبية. يسبق أي return شرطي حتى يبقى ترتيب الـhooks ثابتاً.
+   */
+  const reduceMotion = useReducedMotion();
+  const heroIn = useSharedValue(reduceMotion ? 1 : 0);
+  useEffect(() => {
+    if (reduceMotion) {
+      heroIn.value = 1;
+      return;
+    }
+    heroIn.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
+  }, [reduceMotion, heroIn]);
+  const heroStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(heroIn.value, [0, 1], [1.045, 1]) }],
+  }));
+
+  /** ستارة بلون المرحلة — الضغط على مقرر يفتح صفحة لا يستبدلها */
+  const { run: veilRun, style: veilStyle, color: veilColor, reset: veilReset } = useToneVeil(rad.xl);
+
+  useFocusEffect(useCallback(() => { veilReset(); }, [veilReset]));
 
   if (!gradeId) {
     return (
@@ -274,22 +258,47 @@ export default function TermScreen() {
   const subjects = visibleSubjects(user, inTerm);
   const noneAssigned = !!user && user.role === 'teacher' && subjects.length === 0;
 
-  const pickSubject = (sid: SubjectId) => {
-    setSubject(sid);
-    router.push('/kind' as never);
-  };
+  /** المرحلة قد تكون من جلسة سابقة بعد أن غيّر المشرف الإسناد */
+  const allowedGrades = visibleGrades(user, GRADES.map((g) => g.id) as GradeId[]);
+  if (!allowedGrades.includes(gradeId)) {
+    return (
+      <SafeAreaView style={s.root} edges={['top']}>
+        <View style={s.empty}>
+          <Ionicons name="lock-closed-outline" size={48} color={c.text4} />
+          <Text style={s.emptyTitle}>هذه المرحلة غير مسندة إليك</Text>
+          <Text style={s.emptySub}>راجع المشرف لإسناد الصفوف التي تدرّسها</Text>
+          <Pressable
+            onPress={() => { resetFlow(); router.replace('/' as never); }}
+            style={s.emptyBtn}
+            accessibilityRole="button"
+          >
+            <LinearGradient colors={[c.primary, c.primaryHi]} style={s.emptyBtnGrad}>
+              <Text style={s.emptyBtnText}>العودة للوحة</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const tone = gradeTone(gradeId);
   const muted = heroInkMuted(tone);
+
+  const pickSubject = (sid: SubjectId) => {
+    veilRun(tone.deep, () => {
+      setSubject(sid);
+      router.push('/kind' as never);
+    });
+  };
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: tone.chipBg }]} edges={['top']}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Image source={require('@/assets/brand/bg-warm-mid.jpg')} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(250,250,250,0.62)' }]} />
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(250,250,250,0.58)' }]} />
         <LinearGradient
-          colors={[tone.vivid + '3D', 'rgba(255,255,255,0)', tone.glow + '2E']}
-          locations={[0, 0.48, 1]}
+          colors={[tone.vivid + '28', 'rgba(255,255,255,0)', tone.glow + '1F']}
+          locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
       </View>
@@ -298,7 +307,7 @@ export default function TermScreen() {
         {/* ===== Hero ===== */}
         <Animated.View
           entering={FadeIn.duration(600)}
-          style={[s.hero, { shadowColor: tone.glow }]}
+          style={[s.hero, { shadowColor: tone.glow }, heroStyle]}
         >
           <LinearGradient
             colors={tone.hero}
@@ -308,19 +317,12 @@ export default function TermScreen() {
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
-            colors={[tone.glow + '80', 'rgba(255,255,255,0)', tone.onBase + '14']}
-            locations={[0, 0.5, 1]}
+            colors={[tone.glow + '55', 'rgba(255,255,255,0)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <LinearGradient
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.22)', 'rgba(255,255,255,0)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.heroGloss}
-          />
-          <View pointerEvents="none" style={[s.heroRing, { borderColor: tone.onBase + '24' }]} />
+          <View pointerEvents="none" style={[s.heroRing, { borderColor: tone.onBase + '1F' }]} />
 
           <View style={s.heroContent}>
             <Pressable
@@ -401,7 +403,7 @@ export default function TermScreen() {
         </Animated.View>
 
         {/* ===== المقررات ===== */}
-        <Animated.View entering={FadeInDown.delay(280).duration(500)}>
+        <Animated.View key={term} entering={FadeInDown.delay(80).duration(380)}>
           <SectionHead
             title={`المقررات · ${term === 'term1' ? 'الفصل الأول' : 'الفصل الثاني'}`}
             tone={tone}
@@ -415,14 +417,41 @@ export default function TermScreen() {
             </View>
           ) : (
             <View style={{ gap: sp.sm }}>
-              {subjects.map((sid, i) => (
-                <SubjectCard
-                  key={sid}
-                  sid={sid}
-                  index={i}
-                  onPress={() => pickSubject(sid)}
-                />
-              ))}
+              {subjects.map((sid, i) => {
+                const st = subjectTone(sid);
+                return (
+                  <Animated.View
+                    key={sid}
+                    entering={FadeInDown.delay(80 + i * 60).duration(420)}
+                    style={[s.subjectCard, { shadowColor: st.ink }]}
+                  >
+                    <Pressable
+                      onPress={() => pickSubject(sid)}
+                      style={s.subjectCardInner}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${subjectName(sid)} — جاهز للتقييم`}
+                    >
+                      <LinearGradient
+                        colors={[st.ink + '14', 'rgba(255,255,255,0)']}
+                        start={{ x: 1, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <LinearGradient colors={[st.base, st.ink]} style={s.subjectAccent} />
+                      <View style={[s.subjectIc, { backgroundColor: st.tint, borderColor: st.ink + '22' }]}>
+                        <Ionicons name="book-outline" size={18} color={st.ink} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.subjectName}>{subjectName(sid)}</Text>
+                        <Text style={s.subjectMeta}>جاهز للتقييم</Text>
+                      </View>
+                      <View style={[s.subjectArrow, { backgroundColor: st.tint, borderColor: st.ink + '1A' }]}>
+                        <Ionicons name="chevron-back" size={16} color={st.ink} />
+                      </View>
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
             </View>
           )}
         </Animated.View>
@@ -440,7 +469,7 @@ export default function TermScreen() {
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
-            colors={[tone.glow + '6E', 'rgba(255,255,255,0)']}
+            colors={[tone.glow + '40', 'rgba(255,255,255,0)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -454,18 +483,23 @@ export default function TermScreen() {
           </View>
         </Animated.View>
       </ScrollView>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: veilColor, zIndex: 40 }, veilStyle]}
+      />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg, overflow: 'hidden' },
-  scroll: { padding: sp.md, paddingBottom: sp.huge, gap: sp.md },
+  scroll: { ...contentColumn, padding: sp.md, paddingBottom: sp.huge, gap: sp.md },
 
   /* Hero — تدرّج مشبع وهالات ملوّنة */
   hero: {
-    height: 176, borderRadius: rad.xl, overflow: 'hidden', marginBottom: sp.xs,
-    shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.34, shadowRadius: 26, elevation: 10,
+    height: 192, borderRadius: rad.xl, overflow: 'hidden', marginBottom: sp.sm,
+    shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.38, shadowRadius: 30, elevation: 12,
   },
   heroGloss: {
     position: 'absolute', width: 140, height: 320, top: -70, left: 38,
@@ -514,7 +548,7 @@ const s = StyleSheet.create({
   },
   termInner: {
     paddingVertical: sp.md, paddingHorizontal: sp.md, borderRadius: rad.lg,
-    gap: 2, borderWidth: 1, overflow: 'hidden', backgroundColor: c.tileBg,
+    gap: 2, borderWidth: 1.5, overflow: 'hidden', backgroundColor: c.tileBg,
   },
   termOrb: {
     position: 'absolute', width: 68, height: 68, borderRadius: 34,
@@ -524,33 +558,35 @@ const s = StyleSheet.create({
     position: 'absolute', width: 34, height: 180, top: -40, left: 34,
     opacity: 0.8, transform: [{ rotate: '20deg' }],
   },
-  termText: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
+  termText: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text, flex: 1 },
+  termTop: { flexDirection: 'row', alignItems: 'center', gap: sp.xs },
   termSubRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
+  termIc: { width: 28, height: 28, borderRadius: rad.sm, alignItems: 'center', justifyContent: 'center' },
   termSub: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3 },
   termCheck: {
     width: 16, height: 16, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1,
   },
 
-  /* Subject cards — سطح عائم بظل ملوّن وشريط متدرّج */
-  subjectWrap: {
-    borderRadius: rad.lg, backgroundColor: c.tileBg, elevation: 4,
-    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.26, shadowRadius: 18,
-  },
+  /* Subject cards — عمود رأسي بظل ملوّن */
   subjectCard: {
-    flexDirection: 'row', alignItems: 'center', gap: sp.md,
-    borderRadius: rad.lg, padding: sp.md, overflow: 'hidden',
-    backgroundColor: c.tileBg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)',
+    borderRadius: rad.lg, backgroundColor: c.tileBg, elevation: 5,
+    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.22, shadowRadius: 20,
+    overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)',
   },
-  subjectAccent: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 6, borderTopRightRadius: rad.lg, borderBottomRightRadius: rad.lg },
+  subjectCardInner: {
+    flexDirection: 'row', alignItems: 'center', gap: sp.md,
+    padding: sp.md, borderRadius: rad.lg,
+  },
+  subjectAccent: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 5, borderTopRightRadius: rad.lg, borderBottomRightRadius: rad.lg },
   subjectIc: {
     width: 42, height: 42, borderRadius: rad.md, alignItems: 'center',
     justifyContent: 'center', overflow: 'hidden', borderWidth: 1,
   },
   subjectName: { fontFamily: fnt.b, fontSize: fs.sm, color: c.text },
   subjectMeta: { fontFamily: fnt.r, fontSize: 10.5, color: c.text3, marginTop: 1 },
-  subjectArrowLeft: {
-    width: 30, height: 30, borderRadius: 15, borderWidth: 1,
+  subjectArrow: {
+    width: 32, height: 32, borderRadius: 16, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
   },
 
