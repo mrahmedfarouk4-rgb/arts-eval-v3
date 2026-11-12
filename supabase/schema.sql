@@ -39,12 +39,15 @@ create table if not exists public.evaluations (
   grade_id        text        not null,
   subject_id      text        not null,
   evaluation_type text        not null check (evaluation_type in ('weekly','periodic','final')),
-  evaluation_date date        not null,
+  evaluation_date date,
   label           text        not null default '',
   scores          jsonb       not null default '{}'::jsonb,
   teacher_name    text,
   updated_at      timestamptz not null default now(),
-  deleted         boolean     not null default false
+  deleted         boolean     not null default false,
+  term            text,
+  planned         boolean     default false,
+  unit            integer
 );
 
 comment on table public.evaluations is 'تقييمات الطلاب — scores: {criterionId: degree}'

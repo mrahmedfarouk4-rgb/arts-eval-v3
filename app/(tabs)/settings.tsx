@@ -19,6 +19,7 @@ import {
   updateSettings,
   pendingSyncCount,
   sync,
+  uploadAll,
   exportAll,
   clearAll,
   clearEmptyPlan,
@@ -75,6 +76,27 @@ export default function SettingsScreen() {
       } else {
         setSyncStatus(`❌ تعذرت المزامنة: ${r.error ?? 'تأكد من الاتصال بالإنترنت.'}`);
       }
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onUploadAll = async () => {
+    if (!ready) {
+      setSyncStatus('المزامنة غير مهيّأة: أضف EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
+    setBusy(true);
+    setSyncStatus(null);
+    try {
+      const r = await uploadAll();
+      if (r.ok) {
+        setSyncStatus(`✅ تم رفع ${r.pushed} سجل إلى السحابة.`);
+      } else {
+        setSyncStatus(`❌ لم يكتمل الرفع: ${r.error ?? 'تأكد من الاتصال بالإنترنت.'}`);
+      }
+      await sync();
       await refresh();
     } finally {
       setBusy(false);
@@ -363,6 +385,15 @@ export default function SettingsScreen() {
                 {syncStatus}
               </Text>
             )}
+            <Button
+              label="رفع كل البيانات إلى السحابة"
+              variant="ghost"
+              icon="cloud-upload-outline"
+              onPress={onUploadAll}
+              loading={busy}
+              full
+              style={{ marginTop: sp.sm }}
+            />
             {!!settings?.last_sync && (
               <Text style={s.note}>
                 آخر مزامنة: {settings.last_sync.slice(0, 16).replace('T', ' ')}

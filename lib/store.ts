@@ -987,6 +987,55 @@ export function scheduleAutoSync(delayMs = 3000): void {
   }, delayMs);
 }
 
+/** أعمدة الجدول في Supabase — لا نرسل غيرها حتى لا يرفض السيرفر الصف كاملاً */
+const STUDENT_COLUMNS = ['id', 'name', 'grade_id', 'created_at', 'archived'];
+const EVALUATION_COLUMNS = [
+  'id', 'student_id', 'grade_id', 'term', 'subject_id', 'evaluation_type',
+  'evaluation_date', 'label', 'scores', 'teacher_name', 'updated_at', 'deleted',
+  'planned', 'unit',
+];
+
+/** يبقي الحقول المعروفة فقط ويحوّل القيم الفارغة إلى ما يقبله الجدول */
+function studentRow(s: Student): Record<string, unknown> {
+  return {
+    id: s.id,
+    name: s.name,
+    grade_id: s.grade_id ?? null,
+    created_at: s.created_at || new Date().toISOString(),
+    archived: s.archived ?? false,
+  };
+}
+
+function evaluationRow(e: Evaluation): Record<string, unknown> {
+  return {
+    id: e.id,
+    student_id: e.student_id,
+    grade_id: e.grade_id,
+    term: e.term ?? null,
+    subject_id: e.subject_id,
+    evaluation_type: e.evaluation_type,
+    evaluation_date: e.evaluation_date ? e.evaluation_date : null,
+    label: e.label ?? '',
+    scores: e.scores ?? {},
+    teacher_name: e.teacher_name ?? null,
+    updated_at: e.updated_at || new Date().toISOString(),
+    deleted: e.deleted ?? false,
+    planned: e.planned ?? false,
+    unit: typeof e.unit === 'number' ? e.unit : null,
+  };
+}
+
+function toRow(table: 'students' | 'evaluations', payload: unknown): Record<string, unknown> {
+  if (table === 'students') return pick(studentRow(payload as Student), STUDENT_COLUMNS);
+  return pick(evaluationRow(payload as Evaluation), EVALUATION_COLUMNS);
+}
+
+function pick(row: Record<string, unknown>, cols: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of cols) if (row[k] !== undefined) out[k] = row[k];
+  return out;
+}
+
 export async function sync(): Promise<SyncResult> {
   const sb = initSupabase();
   if (!sb) {
@@ -1001,16 +1050,26 @@ export async function sync(): Promise<SyncResult> {
   try {
     const queue = await read<QueueItem[]>(K.syncQueue, []);
     let pushed = 0;
+    const failures: string[] = [];
 
-    // 1) رفع الطابور (التغييرات منذ آخر مزامنة)
+    // 1) رفع الطابور (التغييرات منذ آخر مزامنة) — ما يفشل يبقى في الطابور للمحاولة التالية
+    const remaining: QueueItem[] = [];
     for (const item of queue) {
       const table = item.table;
       if (item.op === 'delete') {
         const { error } = await sb.from(table).delete().eq('id', item.rowId);
-        if (!error) pushed++;
+        if (error) {
+          failures.push(`${table}: ${error.message}`);
+          remaining.push({ ...item, tries: (item.tries ?? 0) + 1 });
+        } else pushed++;
       } else {
-        const { error } = await sb.from(table).upsert(item.payload as Record<string, unknown>);
-        if (!error) pushed++;
+        const { error } = await sb.from(table).upsert(toRow(table, item.payload));
+        if (error) {
+          failures.push(`${table}: ${error.message}`);
+          remaining.push({ ...item, tries: (item.tries ?? 0) + 1 });
+        } else {
+          pushed++;
+        }
       }
     }
 
@@ -1021,13 +1080,15 @@ export async function sync(): Promise<SyncResult> {
     const isFirstSync = !settings.last_sync;
     if (isFirstSync) {
       for (const s of localStudents) {
-        const { error } = await sb.from('students').upsert(s as unknown as Record<string, unknown>);
-        if (!error) pushed++;
+        const { error } = await sb.from('students').upsert(toRow('students', s));
+        if (error) failures.push(`students: ${error.message}`);
+        else pushed++;
       }
       for (const e of localEvals) {
         if (e.deleted) continue;
-        const { error } = await sb.from('evaluations').upsert(e as unknown as Record<string, unknown>);
-        if (!error) pushed++;
+        const { error } = await sb.from('evaluations').upsert(toRow('evaluations', e));
+        if (error) failures.push(`evaluations: ${error.message}`);
+        else pushed++;
       }
     }
 
@@ -1045,17 +1106,21 @@ export async function sync(): Promise<SyncResult> {
     await write(K.students, [...sMap.values()]);
     await write(K.evaluations, [...eMap.values()]);
 
-    if (queue.length) await write(K.syncQueue, []);
+    if (queue.length) await write(K.syncQueue, remaining);
 
     await updateSettings({ last_sync: new Date().toISOString() });
 
+    const uniqueFailures = [...new Set(failures)];
     return {
-      ok: true,
+      ok: uniqueFailures.length === 0,
       pushed,
       pulled: {
         students: (rStudents ?? []).length,
         evaluations: (rEvals ?? []).length,
       },
+      error: uniqueFailures.length
+        ? `${uniqueFailures.length} عملية لم تُرفع (${remaining.length} في الانتظار) — ${uniqueFailures[0]}`
+        : undefined,
     };
   } catch (e) {
     return {
@@ -1069,6 +1134,54 @@ export async function sync(): Promise<SyncResult> {
 
 export async function pendingSyncCount(): Promise<number> {
   return (await read<QueueItem[]>(K.syncQueue, [])).length;
+}
+
+/**
+ * رفع كامل لكل البيانات المحلية (طلاب + تقييمات) إلى السحابة.
+ * يفيد عندما تضيع عناصر الطابور: بيانات أُنشئت قبل تفعيل المزامنة،
+ * أو رفع فشل سابقاً وأُزيل من الطابور.
+ */
+export async function uploadAll(): Promise<SyncResult> {
+  const sb = initSupabase();
+  if (!sb) {
+    return { ok: false, pushed: 0, pulled: { students: 0, evaluations: 0 }, error: 'المزامنة غير مهيّأة' };
+  }
+  try {
+    const [students, evals] = await Promise.all([
+      read<Student[]>(K.students, []),
+      read<Evaluation[]>(K.evaluations, []),
+    ]);
+    let pushed = 0;
+    const failures: string[] = [];
+
+    for (const s of students) {
+      const { error } = await sb.from('students').upsert(toRow('students', s));
+      if (error) failures.push(`students: ${error.message}`);
+      else pushed++;
+    }
+    for (const e of evals) {
+      const { error } = await sb.from('evaluations').upsert(toRow('evaluations', e));
+      if (error) failures.push(`evaluations: ${error.message}`);
+      else pushed++;
+    }
+
+    const uniqueFailures = [...new Set(failures)];
+    return {
+      ok: uniqueFailures.length === 0,
+      pushed,
+      pulled: { students: 0, evaluations: 0 },
+      error: uniqueFailures.length
+        ? `${uniqueFailures.length} عملية لم تُرفع — ${uniqueFailures[0]}`
+        : undefined,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      pushed: 0,
+      pulled: { students: 0, evaluations: 0 },
+      error: e instanceof Error ? e.message : 'خطأ غير معروف',
+    };
+  }
 }
 
 /* ------------------------------------------------------------------ */
