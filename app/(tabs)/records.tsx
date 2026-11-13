@@ -88,7 +88,8 @@ export default function RecordsScreen() {
       const ae = Object.keys(a.scores ?? {}).length > 0;
       const be = Object.keys(b.scores ?? {}).length > 0;
       if (ae !== be) return ae ? -1 : 1;
-      return b.evaluation_date.localeCompare(a.evaluation_date);
+      // التاريخ فارغ في الاستمارات المهيّأة — نفرّغه بدل أن يُسقط الفرز
+      return String(b.evaluation_date || '').localeCompare(String(a.evaluation_date || ''));
     });
     if (filterGrade) list = list.filter((e) => e.grade_id === filterGrade);
     if (filterKind) list = list.filter((e) => e.evaluation_type === filterKind);

@@ -180,7 +180,9 @@ function dropExactDuplicates(list: Evaluation[]): { list: Evaluation[]; removed:
 function collapseRounds(list: Evaluation[]): { list: Evaluation[]; archived: number } {
   const groups = new Map<string, Evaluation[]>();
   for (const e of list) {
-    if (e.deleted || e.evaluation_type === 'weekly') continue;
+    // الاستمارات المهيّأة (planned) ليست جولات — لا تُطوى ولا تُؤرشف،
+    // وكتواريخها فارغة كانت تُسقط الفرز أدناه عند الإقلاع.
+    if (e.deleted || e.planned || e.evaluation_type === 'weekly') continue;
     const k = `${e.student_id}|${e.grade_id}|${e.term}|${e.subject_id}|${e.evaluation_type}`;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k)!.push(e);
@@ -189,10 +191,11 @@ function collapseRounds(list: Evaluation[]): { list: Evaluation[]; archived: num
   const archived = new Set<string>();
   for (const group of groups.values()) {
     if (group.length < 2) continue;
-    // الأحدث أولاً، فالأحدث يُبقى
+    // الأحدث أولاً، فالأحدث يُبقى — التاريخ قد يكون فارغاً في صفوف قديمة
+    // مرّت من المزامنة، فنفرغه إلى '' بدل أن ينفجر localeCompare
     const sorted = [...group].sort(
       (a, b) =>
-        b.evaluation_date.localeCompare(a.evaluation_date) ||
+        String(b.evaluation_date || '').localeCompare(String(a.evaluation_date || '')) ||
         seqOf(b.id) - seqOf(a.id)
     );
     for (const e of sorted.slice(1)) archived.add(e.id);
@@ -502,7 +505,11 @@ export async function evaluationsForStudent(studentId: string): Promise<Evaluati
   const all = await listEvaluations();
   return all
     .filter((e) => e.student_id === studentId)
-    .sort((a, b) => b.evaluation_date.localeCompare(a.evaluation_date));
+    // التاريخ فارغ في الاستمارات المهيّأة وصفوف قديمة رأت السحابة —
+    // نفرّغه بدل أن يُسقط الفرز فيتوقف الحفظ والعرض
+    .sort((a, b) =>
+      String(b.evaluation_date || '').localeCompare(String(a.evaluation_date || ''))
+    );
 }
 
 export async function evaluationsForCell(params: {
@@ -1242,7 +1249,10 @@ export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> 
     for (const s of (rStudents as Student[]) ?? []) sMap.set(s.id, s);
 
     const eMap = new Map(localEvals.map((e) => [e.id, e]));
-    for (const e of (rEvals as Evaluation[]) ?? []) eMap.set(e.id, e);
+    // صفوف السحابة تُطبَّع قبل الدمج: عمود evaluation_date من نوع date
+    // فيقابله Supabase بالفارغ null، وكان يعود فيطمر التواريخ محلياً
+    // فينكسر كل فرزٍ يعتمد على التاريخ (الحفظ، الطباعة، السجل).
+    for (const e of (rEvals as Evaluation[]) ?? []) eMap.set(e.id, normalizeEvalRow(e));
 
     await write(K.students, [...sMap.values()]);
     await write(K.evaluations, [...eMap.values()]);
@@ -1271,6 +1281,21 @@ export async function sync(opts: { force?: boolean } = {}): Promise<SyncResult> 
       error: e instanceof Error ? e.message : 'خطأ غير معروف',
     };
   }
+}
+
+/**
+ * عكس `evaluationRow` — صف تقييم قادم من السحابة إلى شكله المحلي.
+ * نضمن الحقول الأساسية: التاريخ الفارغ (استمارات مهيّأة) يعود من عمود
+ * `date` بالقيمة null فيُصحَّح إلى '' حتى لا يكسر الفرزات والعرض.
+ */
+function normalizeEvalRow(e: Evaluation): Evaluation {
+  return {
+    ...e,
+    evaluation_date: e.evaluation_date ?? '',
+    label: e.label ?? '',
+    scores: e.scores ?? {},
+    planned: e.planned === true,
+  };
 }
 
 export async function pendingSyncCount(): Promise<number> {

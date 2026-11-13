@@ -2,7 +2,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, I18nManager } from 'react-native';
+import { Alert, Platform, View, StyleSheet, ActivityIndicator, I18nManager } from 'react-native';
 import { c, fnt } from '@/constants/brand';
 import { useAppFonts } from '@/hooks/use-app-fonts';
 import { scheduleAutoSync } from '@/lib/store';
@@ -16,6 +16,26 @@ import {
 
 // أول سطر يُنفَّذ في الحزمة: أي استيراد سيئ بعده لن يُلتقط
 installGlobalHandler();
+
+/**
+ * تنبيهات الويب — react-native-web لا يُنفّذ Alert.alert إطلاقاً، فتضيع
+ * رسائل «تم الحفظ/خطأ» في المتصفح صامتة ويظن المعلم أن الحفظ لم يحدث.
+ * نحوّل التنبيه إلى window.alert الظاهرة.
+ *
+ * أزرار التنبيه لا تُنفَّذ تلقائياً إلا حين يكون الزر وحيداً وغير هادم
+ * (مثل «متابعة التقييم» بعد الحفظ). التنبيهات متعددة الأزرار — وأكثرها
+ * تأكيدات حذف — لا تُنفَّذ أزرارها هنا؛ من يحتاج تأكيداً فعلياً على الويب
+ * يستعمل confirmAction() في lib/dialog.ts.
+ */
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  Alert.alert = (title, message, buttons) => {
+    const text = message ? `${title}\n\n${message}` : (title ?? '');
+    if (text.trim()) window.alert(text);
+    if (buttons?.length === 1 && buttons[0].style !== 'cancel' && buttons[0].style !== 'destructive') {
+      buttons[0].onPress?.();
+    }
+  };
+}
 
 /**
  * ⚠ `I18nManager.forceRTL` **لا يُستدعى هنا أبداً**.

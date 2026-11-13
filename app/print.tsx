@@ -7,7 +7,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import {
   gradeName, subjectName, kindMeta, formTotals, sumScores, levelFor,
-  convertTo2, convertTo30, EVAL_KINDS,
+  convertTo2, convertTo30, EVAL_KINDS, GRADES, subjectsForGrade,
 } from '@/constants/criteria';
 import type { GradeId, SubjectId } from '@/constants/criteria';
 import type { CriteriaKind } from '@/constants/criteria.data';
@@ -15,8 +15,13 @@ import { c as p, sp, rad, fnt, fs, kindTone } from '@/constants/brand';
 import { contentColumn } from '@/constants/layout';
 import { Button, Card, Banner, Section, TopBar, Stat, Segmented } from '@/components/pro-ui';
 import { useSession } from '@/lib/session';
+import { useAuth } from '@/lib/auth';
+import { visibleGrades, visibleSubjects } from '@/lib/accounts';
 import { buildPrintHtml, toPrintRow, type PrintRow } from '@/lib/print-html';
 import { getDraft, getEvaluationById, evaluationsForStudent, listStudents, listEvaluations, type Evaluation } from '@/lib/store';
+
+/** المراحل الفعّالة — يستثنى المعرّف القديم intermediate1 كما في بقية الشاشات */
+const ACTIVE_GRADES = GRADES.filter((g) => g.id !== 'intermediate1');
 
 export default function PrintScreen() {
   const router = useRouter();
@@ -34,6 +39,7 @@ export default function PrintScreen() {
     from?: string;
   }>();
   const { term, teacherName } = useSession();
+  const { user } = useAuth();
 
   const goBack = () => {
     const from = params.from;
@@ -95,6 +101,22 @@ export default function PrintScreen() {
   const subjectId = (params.subjectId ?? '') as SubjectId;
   const kind = (params.kind ?? 'weekly') as CriteriaKind;
 
+  /* ---------------- اختيار المرحلة والمقرر (الوضع الجماعي) ---------------- */
+  /**
+   * «الطباعة» من القائمة الجانبية تفتح الشاشة بلا معاملات، فتظهر دفعة
+   * بلا مرحلة ولا مقرر. نعرض منتقيات مقيّدة بما يراه الحساب — المعلم
+   * لا يرى إلا مراحله ومقرراته المسندة، والمشرف يرى الكل — ولا تُعرض
+   * أقسام الدفعة إلا بعد اختيار الاثنين.
+   */
+  const myGrades = useMemo(
+    () => visibleGrades(user, ACTIVE_GRADES.map((g) => g.id)),
+    [user]
+  );
+  const mySubjects = useMemo(
+    () => (gradeId ? visibleSubjects(user, subjectsForGrade(gradeId, 'all')) : []),
+    [user, gradeId]
+  );
+
   /* ---------------- تحميل بيانات الوضع المفرد ---------------- */
   /**
    * كان التحميل مرتبطاً بـmode وحدها، فيبقى على الشاشة واحدة عند الانتقال
@@ -147,8 +169,8 @@ export default function PrintScreen() {
       }
       const list = await evaluationsForStudent(sid);
       const match = list
-        .filter((e) => e.grade_id === gradeId && e.subject_id === subjectId && e.evaluation_type === kind)
-        .sort((a: Evaluation, b: Evaluation) => b.evaluation_date.localeCompare(a.evaluation_date));
+        .filter((e) => e.grade_id === gradeId && e.subject_id === subjectId && e.evaluation_type === kind && isFilled(e))
+        .sort((a: Evaluation, b: Evaluation) => evalDate(b).localeCompare(evalDate(a)));
       if (match[0]) {
         setScores(match[0].scores ?? {});
         setLabel(match[0].label ?? '');
@@ -174,15 +196,15 @@ export default function PrintScreen() {
     })();
   }, []);
 
-  // تقييمات الصف/المقرر المختار — كل الأنواع (لحساب الأعداد)
+  // تقييمات الصف/المقرر المختار — المعبّأة فقط (الاستمارة الفارغة ليست سجلاً يُطبع)
   const cellEvals = useMemo(() => {
     if (!gradeId || !subjectId) return [];
     return allEvals
-      .filter((e) => e.grade_id === gradeId && e.subject_id === subjectId && !e.deleted)
+      .filter((e) => e.grade_id === gradeId && e.subject_id === subjectId && !e.deleted && isFilled(e))
       .sort(
         (a, b) =>
           (names[a.student_id] ?? '').localeCompare(names[b.student_id] ?? '', 'ar') ||
-          a.evaluation_date.localeCompare(b.evaluation_date)
+          evalDate(a).localeCompare(evalDate(b))
       );
   }, [allEvals, gradeId, subjectId, names]);
 
@@ -222,7 +244,7 @@ export default function PrintScreen() {
         }
         const picked: Evaluation[] = [];
         for (const arr of byStudent.values()) {
-          const sorted = [...arr].sort((a, b) => a.evaluation_date.localeCompare(b.evaluation_date));
+          const sorted = [...arr].sort((a, b) => evalDate(a).localeCompare(evalDate(b)));
           if (sorted[n - 1]) picked.push(sorted[n - 1]);
         }
         list = picked;
@@ -342,7 +364,13 @@ export default function PrintScreen() {
     <SafeAreaView style={st.bg} edges={['bottom']}>
       <TopBar
         title="معاينة الطباعة"
-        sub={mode === 'single' ? params.studentName : `${subjectName(subjectId)} · ${gradeName(gradeId)}`}
+        sub={
+          mode === 'single'
+            ? params.studentName
+            : gradeId && subjectId
+              ? `${subjectName(subjectId)} · ${gradeName(gradeId)}`
+              : 'اختر المرحلة والمقرر'
+        }
         onBack={goBack}
       />
 
@@ -443,6 +471,46 @@ export default function PrintScreen() {
                 نموذج معتمد — شكل الورقة المطبوعة مقفل ولا يمكن تعديله
               </Text>
             </View>
+          </>
+        ) : !gradeId || !subjectId ? (
+          <>
+            {/* منتقيات المرحلة والمقرر — عند فتح الشاشة من القائمة بلا معاملات */}
+            <Section title="المرحلة والمقرر" hint="اختر المرحلة ثم المقرر لعرض الدفعة">
+              <Text style={st.pickLabel}>المرحلة</Text>
+              <View style={st.chipWrap}>
+                {myGrades.map((g) => (
+                  <Pressable
+                    key={g}
+                    onPress={() => router.setParams({ gradeId: g, subjectId: '' })}
+                    style={[st.chip, gradeId === g && st.chipActive]}
+                  >
+                    <Text style={[st.chipText, gradeId === g && st.chipTextActive]}>
+                      {gradeName(g)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={[st.pickLabel, { marginTop: sp.sm }]}>المقرر</Text>
+              {gradeId && mySubjects.length > 0 ? (
+                <View style={st.chipWrap}>
+                  {mySubjects.map((sid) => (
+                    <Pressable
+                      key={sid}
+                      onPress={() => router.setParams({ subjectId: sid })}
+                      style={[st.chip, subjectId === sid && st.chipActive]}
+                    >
+                      <Text style={[st.chipText, subjectId === sid && st.chipTextActive]}>
+                        {subjectName(sid)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={st.pickEmpty}>
+                  {gradeId ? 'لا توجد مقررات لهذه المرحلة لحسابك' : 'اختر المرحلة أولاً لعرض مقرراتها'}
+                </Text>
+              )}
+            </Section>
           </>
         ) : (
           <>
@@ -586,6 +654,16 @@ function todayISO(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/**
+ * تاريخ التقييم للفرز — الاستمارات المهيّأة وصفوف قديمة رأت المزامنة
+ * قد تحمل التاريخ فارغاً (null)، فنفرّغه بدل أن ينفجر localeCompare
+ * ويوقف الطباعة كلها.
+ */
+const evalDate = (e: Evaluation) => String(e.evaluation_date || '');
+
+/** استمارة معبّأة فعلاً — الفارغة placeholder لا تُطبع ولا تُعدّ سجلاً */
+const isFilled = (e: Evaluation) => Object.keys(e.scores ?? {}).length > 0;
+
 const st = StyleSheet.create({
   bg: { flex: 1, backgroundColor: p.bg },
   scroll: { ...contentColumn, paddingHorizontal: sp.lg, paddingBottom: sp.huge, gap: sp.lg },
@@ -677,4 +755,7 @@ const st = StyleSheet.create({
   chipActive: { backgroundColor: p.primary, borderColor: p.primary },
   chipText: { fontFamily: fnt.m, fontSize: fs.xs, color: p.text2 },
   chipTextActive: { color: '#FFFFFF', fontFamily: fnt.b },
+  chipWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: sp.sm },
+  pickLabel: { fontFamily: fnt.b, fontSize: fs.xs, color: p.text3, marginBottom: sp.xs },
+  pickEmpty: { fontFamily: fnt.r, fontSize: fs.xs, color: p.text3 },
 });

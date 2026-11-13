@@ -9,8 +9,11 @@ import {
   type GradeId,
 } from '@/constants/criteria';
 import type { CriteriaKind } from '@/constants/criteria.data';
-import { c, sp, rad, fnt, fs, kindTone } from '@/constants/brand';
-import { Card, Badge, Empty, Progress, TopBar, Section } from '@/components/pro-ui';
+import { c, sp, rad, fnt, fs, gradeTone, kindTone } from '@/constants/brand';
+import { contentColumn } from '@/constants/layout';
+import { PageHero, HeroStat, HeroDivider, SectionHead } from '@/components/page-hero';
+import { Card, Badge, Empty, Progress, TopBar } from '@/components/pro-ui';
+import { StudentReportCardModal } from '@/components/student-report-card';
 import { evaluationsForStudent, listStudents, type Evaluation, type Student } from '@/lib/store';
 
 interface Cell {
@@ -26,6 +29,7 @@ export default function StudentScreen() {
   const [student, setStudent] = useState<Student | null>(null);
   const [evals, setEvals] = useState<Evaluation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportVisible, setReportVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -40,6 +44,7 @@ export default function StudentScreen() {
   }, [params.id]);
 
   const gradeId = (student?.grade_id ?? 'grade4') as GradeId;
+  const tone = gradeTone(gradeId);
 
   /** مصفوفة: مقرّر × نوع تقييم — آخر نتيجة وعدد التسجيلات */
   const matrix = useMemo<Cell[]>(() => {
@@ -50,7 +55,10 @@ export default function StudentScreen() {
         const t = formTotals(k, gradeId, sid, 'all');
         const list = evals
           .filter((e) => e.subject_id === sid && e.evaluation_type === k)
-          .sort((a, b) => b.evaluation_date.localeCompare(a.evaluation_date));
+          // التاريخ فارغ في الاستمارات المهيّأة — نفرّغه بدل أن يُسقط الفرز
+          .sort((a, b) =>
+            String(b.evaluation_date || '').localeCompare(String(a.evaluation_date || ''))
+          );
         counts[k] = list.length;
         last[k] = list.length
           ? { score: sumScores(list[0].scores ?? {}, t.criteria), max: t.actualMax }
@@ -97,59 +105,56 @@ export default function StudentScreen() {
 
   const ratedSubjects = matrix.filter((r) => EVAL_KINDS.some((k) => r.counts[k.id] > 0)).length;
   const recent = [...evals]
-    .sort((a, b) => b.evaluation_date.localeCompare(a.evaluation_date))
+    // التاريخ فارغ في الاستمارات المهيّأة — نفرّغه بدل أن يُسقط الفرز
+    .sort((a, b) => String(b.evaluation_date || '').localeCompare(String(a.evaluation_date || '')))
     .slice(0, 12);
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
-      <TopBar title={student.name} sub={gradeName(gradeId)} onBack={() => router.back()} />
-
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* بطاقة الطالب */}
-        <Card padding={sp.lg}>
-          <View style={s.heroRow}>
-            <View style={s.bigAvatar}>
-              <Text style={s.bigAvatarText}>{student.name.charAt(0)}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.heroName} numberOfLines={1}>{student.name}</Text>
-              <View style={{ marginTop: 6, alignSelf: 'flex-start' }}>
-                <Badge label={gradeName(gradeId)} color={c.primary} bg={c.primaryBg} />
-              </View>
-            </View>
-          </View>
+        <PageHero
+          tone={tone}
+          eyebrow="ملف الطالب"
+          title={student.name}
+          sub={`${gradeName(gradeId)} · ${evals.length} تقييم مسجل`}
+          onBack={() => router.back()}
+        >
+          <HeroStat value={evals.length} label="إجمالي التقييمات" tone={tone} />
+          <HeroDivider tone={tone} />
+          <HeroStat value={ratedSubjects} label="مقررات مُقيَّمة" tone={tone} />
+          <HeroDivider tone={tone} />
+          <HeroStat value={matrix.length - ratedSubjects} label="مقررات متبقية" tone={tone} />
+        </PageHero>
 
-          <View style={s.hRule} />
-
-          <View style={s.statRow}>
-            <View style={s.stat}>
-              <Text style={s.statValue}>{evals.length}</Text>
-              <Text style={s.statLabel}>إجمالي التقييمات</Text>
-            </View>
-            <View style={s.vRule} />
-            <View style={s.stat}>
-              <Text style={s.statValue}>{ratedSubjects}</Text>
-              <Text style={s.statLabel}>مقررات مُقيَّمة</Text>
-            </View>
-            <View style={s.vRule} />
-            <View style={s.stat}>
-              <Text style={[s.statValue, { color: c.ok }]}>
-                {matrix.length - ratedSubjects}
-              </Text>
-              <Text style={s.statLabel}>مقررات متبقية</Text>
-            </View>
-          </View>
-        </Card>
+        {/* زر مشاركة التقرير الذكي */}
+        <Pressable
+          onPress={() => setReportVisible(true)}
+          style={({ pressed }) => [
+            s.reportBtn,
+            { backgroundColor: tone.base, borderColor: tone.deep + '30' },
+            pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="عرض ومشاركة بطاقة التقرير لولي الأمر"
+        >
+          <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
+          <Text style={s.reportBtnText}>عرض ومشاركة بطاقة التقرير لولي الأمر</Text>
+          <Ionicons name="share-social-outline" size={17} color="#FFFFFF" style={{ marginLeft: 'auto' }} />
+        </Pressable>
 
         {/* مصفوفة التقييمات */}
-        <Section title="التقييمات حسب المقرر" hint="اضغط الخانة لفتح الاستمارة">
-          <View style={{ gap: sp.sm }}>
+        <SectionHead title="التقييمات حسب المقرر" hint="اضغط الخانة لفتح الاستمارة" tone={tone} />
+        <View style={{ gap: sp.sm, marginTop: -sp.md }}>
             {matrix.map((row) => {
               const subj = SUBJECTS.find((x) => x.id === row.subject);
               const total = EVAL_KINDS.reduce((a, k) => a + row.counts[k.id], 0);
 
               return (
-                <Card key={row.subject} padding={sp.md}>
+                <Card
+                  key={row.subject}
+                  padding={sp.md}
+                  accent={total > 0 ? tone.vivid : undefined}
+                >
                   <View style={s.row}>
                     <View style={s.subjIcon}>
                       <Ionicons name="brush" size={16} color={c.primary} />
@@ -213,12 +218,12 @@ export default function StudentScreen() {
                 </Card>
               );
             })}
-          </View>
-        </Section>
+        </View>
 
         {/* آخر التقييمات */}
         {recent.length > 0 && (
-          <Section title="آخر التقييمات" count={recent.length}>
+          <View style={{ gap: sp.sm }}>
+            <SectionHead title="آخر التقييمات" count={recent.length} tone={tone} />
             <Card padding={0}>
               {recent.map((e, i) => {
                 const t = formTotals(e.evaluation_type, e.grade_id, e.subject_id, e.term ?? 'all');
@@ -256,11 +261,19 @@ export default function StudentScreen() {
                 );
               })}
             </Card>
-          </Section>
+          </View>
         )}
 
         <View style={{ height: sp.xl }} />
       </ScrollView>
+
+      <StudentReportCardModal
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        student={student}
+        evaluations={evals}
+        gradeId={gradeId}
+      />
     </SafeAreaView>
   );
 }
@@ -269,7 +282,7 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  scroll: { paddingHorizontal: sp.lg, paddingTop: sp.lg, paddingBottom: sp.huge, gap: sp.xl },
+  scroll: { ...contentColumn, paddingHorizontal: sp.lg, paddingTop: sp.lg, paddingBottom: sp.huge, gap: sp.xl },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
 
@@ -324,4 +337,24 @@ const s = StyleSheet.create({
   histMeta: { fontFamily: fnt.r, fontSize: 9.5, color: c.text3, marginTop: 2 },
   histScore: { fontFamily: fnt.bk, fontSize: fs.md },
   histScoreMax: { fontFamily: fnt.b, fontSize: 9.5, color: c.text3 },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.sm,
+    paddingHorizontal: sp.md,
+    paddingVertical: 12,
+    borderRadius: rad.md,
+    borderWidth: 1,
+    marginTop: -sp.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  reportBtnText: {
+    fontFamily: fnt.b,
+    fontSize: fs.xs,
+    color: '#FFFFFF',
+  },
 });

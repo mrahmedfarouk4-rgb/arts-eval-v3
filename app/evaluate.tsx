@@ -238,7 +238,8 @@ export default function EvaluateScreen() {
 
       if (cell.length) {
         const last = [...cell].sort((a: Evaluation, b: Evaluation) =>
-          b.evaluation_date.localeCompare(a.evaluation_date)
+          // التاريخ فارغ في الاستمارات المهيّأة — نفرّغه بدل أن يُسقط الفرز
+          String(b.evaluation_date || '').localeCompare(String(a.evaluation_date || ''))
         )[0];
         setScores(last.scores ?? {});
         setLabel(last.label ?? '');
