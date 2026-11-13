@@ -12,16 +12,33 @@ import {
     gradeName,
     kindMeta,
     subjectName,
+    subjectsForGrade,
     sumScores,
 } from '@/constants/criteria';
 import type { CriteriaKind } from '@/constants/criteria.data';
+import type { GradeId, SubjectId, TermId } from '@/constants/criteria';
 import { visibleGrades } from '@/lib/accounts';
 import { useAuth } from '@/lib/auth';
-import { listEvaluations, listStudents, type Evaluation } from '@/lib/store';
+import {
+    listEvaluations,
+    listStudents,
+    saveEvaluation,
+    type Evaluation,
+    type Student,
+} from '@/lib/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    Alert,
+    Pressable,
+    ScrollView,
+    SectionList,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MONTHS = [
@@ -53,11 +70,25 @@ export default function RecordsScreen() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
+  /* ---------------- مودال إضافة تقييم جديد ---------------- */
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addStudentId, setAddStudentId] = useState<string | null>(null);
+  const [addGradeId, setAddGradeId] = useState<GradeId | null>(null);
+  const [addSubjectId, setAddSubjectId] = useState<SubjectId | null>(null);
+  const [addKind, setAddKind] = useState<CriteriaKind | null>('weekly');
+  const [addTerm, setAddTerm] = useState<TermId | null>('term1');
+  const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
+  const [addLabel, setAddLabel] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
+
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+
   useEffect(() => {
     (async () => {
       try {
         const [e, s] = await Promise.all([listEvaluations(), listStudents(true)]);
         setEvals(e);
+        setAllStudents(s);
         const n: Record<string, string> = {};
         for (const st of s) n[st.id] = st.name;
         setNames(n);
@@ -78,6 +109,21 @@ export default function RecordsScreen() {
     () => evals.filter((e) => allowedGradeIds.has(e.grade_id)),
     [evals, allowedGradeIds]
   );
+
+  /** الطلاب المتاحين للإضافة (غير مؤرشفين وفي مراحل الحساب المسموحة) */
+  const addStudents = useMemo(
+    () =>
+      allStudents.filter(
+        (s) => !s.archived && s.grade_id && allowedGradeIds.has(s.grade_id)
+      ),
+    [allStudents, allowedGradeIds]
+  );
+
+  /** المقررات المتاحة للمرحلة المختارة في إضافة تقييم جديد */
+  const addSubjects = useMemo(() => {
+    if (!addGradeId) return [];
+    return subjectsForGrade(addGradeId, addTerm ?? 'all');
+  }, [addGradeId, addTerm]);
 
   const scored = scopedEvals.filter((e) => Object.keys(e.scores ?? {}).length > 0);
   const pending = scopedEvals.length - scored.length;
@@ -223,6 +269,77 @@ export default function RecordsScreen() {
     return { strengths, focusAreas };
   }, [scopedEvals]);
 
+  /* ---------------- إنشاء تقييم جديد ---------------- */
+  const handleCreateEvaluation = useCallback(async () => {
+    const studentId = addStudentId;
+    const gradeId = addGradeId;
+    const subjectId = addSubjectId;
+    const kind = addKind;
+    const term = addTerm;
+    const date = addDate;
+    if (!studentId || !gradeId || !subjectId || !kind || !term || !date) {
+      Alert.alert('بيانات ناقصة', 'الرجاء اختيار الطالب والمرحلة والمقرر والنوع والفصل والتاريخ.');
+      return;
+    }
+    setAddBusy(true);
+    try {
+      const saved = await saveEvaluation({
+        id: undefined,
+        student_id: studentId,
+        grade_id: gradeId,
+        term: term,
+        subject_id: subjectId,
+        evaluation_type: kind,
+        evaluation_date: date,
+        label: addLabel.trim() || `${kindMeta(kind).name} ${date}`,
+        scores: {},
+        teacher_name: null,
+      });
+
+      setShowAddModal(false);
+      setAddStudentId(null);
+      setAddGradeId(null);
+      setAddSubjectId(null);
+      setAddKind('weekly');
+      setAddTerm('term1');
+      setAddDate(new Date().toISOString().slice(0, 10));
+      setAddLabel('');
+
+      // إعادة تحميل السجل ليظهر التقييم الجديد
+      const [e] = await Promise.all([listEvaluations()]);
+      setEvals(e);
+
+      // التوجيه إلى شاشة التقييم لتعبئة الدرجات
+      router.push({
+        pathname: '/evaluate',
+        params: {
+          studentId: studentId,
+          studentName: names[studentId] ?? 'طالب',
+          gradeId: gradeId,
+          subjectId: subjectId,
+          kind: kind,
+          evalId: saved.id,
+          term: term,
+          from: '/records',
+        } as never,
+      });
+    } catch (err) {
+      Alert.alert('خطأ', err instanceof Error ? err.message : 'تعذّر إنشاء التقييم');
+    } finally {
+      setAddBusy(false);
+    }
+  }, [
+    addStudentId,
+    addGradeId,
+    addSubjectId,
+    addKind,
+    addTerm,
+    addDate,
+    addLabel,
+    names,
+    router,
+  ]);
+
   return (
     <SafeAreaView style={s.root} edges={['top']}>
       <SectionList
@@ -275,6 +392,18 @@ export default function RecordsScreen() {
           <Stat value={`${avg}%`} label="متوسط النسبة" color={c.primary} />
         </View>
       </View>
+
+      <Pressable
+        onPress={() => setShowAddModal(true)}
+        style={s.addEvalBtn}
+        accessibilityRole="button"
+        disabled={addBusy}
+      >
+        <View style={s.addEvalRow}>
+          <Ionicons name="add" size={17} color="#FFFFFF" />
+          <Text style={s.addEvalText}>إضافة تقييم جديد</Text>
+        </View>
+      </Pressable>
 
       {/* ===== مؤشّر الإتقان — بطاقات دائرية، والضغط على واحدة يصفّي السجل ===== */}
       {!loading && scored.length > 0 && (
@@ -657,6 +786,157 @@ export default function RecordsScreen() {
             );
           }}
         />
+        {showAddModal && (
+          <View style={s.modalBackdrop} accessible={true} accessibilityLabel="مودال إضافة تقييم جديد">
+            <View style={s.modalCard}>
+              <View style={s.modalHeader}>
+                <Text style={s.modalTitle}>إضافة تقييم جديد</Text>
+                <Pressable onPress={() => setShowAddModal(false)} accessibilityRole="button">
+                  <Ionicons name="close" size={22} color={c.text3} />
+                </Pressable>
+              </View>
+              <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false} contentContainerStyle={s.modalBodyContent}>
+                <Text style={s.modalFieldLabel}>الطالب</Text>
+                <View style={s.modalFieldRow}>
+                  {addStudents.map((st) => (
+                    <Pressable
+                      key={st.id}
+                      onPress={() => setAddStudentId(st.id)}
+                      style={[
+                        s.modalChip,
+                        addStudentId === st.id && s.modalChipSelected,
+                      ]}
+                    >
+                      <Text style={[s.modalChipText, addStudentId === st.id && s.modalChipTextSelected]}>
+                        {st.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={s.modalFieldLabel}>المرحلة</Text>
+                <View style={s.modalFieldRow}>
+                  {ACTIVE_GRADES.filter((g) => allowedGradeIds.has(g.id)).map((g) => (
+                    <Pressable
+                      key={g.id}
+                      onPress={() => {
+                        setAddGradeId(g.id);
+                        setAddSubjectId(null);
+                      }}
+                      style={[
+                        s.modalChip,
+                        addGradeId === g.id && s.modalChipSelected,
+                      ]}
+                    >
+                      <Text style={[s.modalChipText, addGradeId === g.id && s.modalChipTextSelected]}>
+                        {g.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={s.modalFieldLabel}>المقرر</Text>
+                <View style={s.modalFieldRow}>
+                  {addSubjects.map((sid) => (
+                    <Pressable
+                      key={sid}
+                      onPress={() => setAddSubjectId(sid)}
+                      style={[
+                        s.modalChip,
+                        addSubjectId === sid && s.modalChipSelected,
+                      ]}
+                    >
+                      <Text style={[s.modalChipText, addSubjectId === sid && s.modalChipTextSelected]}>
+                        {subjectName(sid)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <View style={s.modalFieldRow2}>
+                  <View style={s.modalFieldCol}>
+                    <Text style={s.modalFieldLabel}>نوع التقييم</Text>
+                    <View style={s.modalFieldRow}>
+                      {(['weekly', 'periodic', 'final'] as CriteriaKind[]).map((k) => (
+                        <Pressable
+                          key={k}
+                          onPress={() => setAddKind(k)}
+                          style={[
+                            s.modalChip,
+                            addKind === k && s.modalChipSelected,
+                          ]}
+                        >
+                          <Text style={[s.modalChipText, addKind === k && s.modalChipTextSelected]}>
+                            {kindMeta(k).name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                  <View style={s.modalFieldCol}>
+                    <Text style={s.modalFieldLabel}>الفصل الدراسي</Text>
+                    <View style={s.modalFieldRow}>
+                      {(['term1', 'term2'] as TermId[]).map((t) => (
+                        <Pressable
+                          key={t}
+                          onPress={() => setAddTerm(t)}
+                          style={[
+                            s.modalChip,
+                            addTerm === t && s.modalChipSelected,
+                          ]}
+                        >
+                          <Text style={[s.modalChipText, addTerm === t && s.modalChipTextSelected]}>
+                            {t === 'term1' ? 'الفصل الأول' : 'الفصل الثاني'}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                <Text style={s.modalFieldLabel}>التاريخ</Text>
+                <TextInput
+                  style={s.modalInput}
+                  value={addDate}
+                  onChangeText={setAddDate}
+                  placeholder="YYYY-MM-DD"
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+
+                <Text style={s.modalFieldLabel}>عنوان التقييم (اختياري)</Text>
+                <TextInput
+                  style={s.modalInput}
+                  value={addLabel}
+                  onChangeText={setAddLabel}
+                  placeholder="مثال: الوحدة الأولى"
+                />
+              </ScrollView>
+
+              <View style={s.modalFooter}>
+                <Pressable
+                  onPress={() => setShowAddModal(false)}
+                  style={s.modalCancelBtn}
+                  accessibilityRole="button"
+                >
+                  <Text style={s.modalCancelText}>إلغاء</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleCreateEvaluation}
+                  style={s.modalSaveBtn}
+                  accessibilityRole="button"
+                  disabled={addBusy || !addStudentId || !addGradeId || !addSubjectId || !addKind || !addTerm || !addDate}
+                >
+                  {addBusy ? (
+                    <Text style={s.modalSaveText}>جاري الإنشاء…</Text>
+                  ) : (
+                    <Text style={s.modalSaveText}>إنشاء التقييم</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
     </SafeAreaView>
   );
 }
@@ -905,4 +1185,154 @@ const s = StyleSheet.create({
   bdVal: { fontFamily: fnt.b, fontSize: fs.xxs, color: c.text, minWidth: 30, textAlign: 'center' },
   bdValMax: { fontFamily: fnt.r, fontSize: 9.5, color: c.text4 },
   bdEmpty: { fontFamily: fnt.r, fontSize: fs.xxs, color: c.text3, lineHeight: 18 },
+
+  /* ---------------- مودال إضافة تقييم جديد ---------------- */
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  modalCard: {
+    width: '92%',
+    maxWidth: 420,
+    backgroundColor: c.bg,
+    borderRadius: rad.xl,
+    borderWidth: 1,
+    borderColor: c.line,
+    overflow: 'hidden',
+    shadowColor: c.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: sp.md,
+    borderBottomWidth: 1,
+    borderBottomColor: c.line,
+  },
+  modalTitle: {
+    fontFamily: fnt.b,
+    fontSize: fs.md,
+    color: c.text,
+  },
+  modalBody: {
+    maxHeight: 560,
+  },
+  modalBodyContent: {
+    padding: sp.md,
+    gap: sp.md,
+  },
+  modalFieldLabel: {
+    fontFamily: fnt.b,
+    fontSize: fs.xs,
+    color: c.text2,
+    marginBottom: sp.xs,
+  },
+  modalFieldRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: sp.xs,
+    marginBottom: sp.sm,
+  },
+  modalFieldRow2: {
+    flexDirection: 'row',
+    gap: sp.md,
+    marginBottom: sp.sm,
+  },
+  modalFieldCol: {
+    flex: 1,
+  },
+  modalChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: sp.sm,
+    paddingVertical: 6,
+    borderRadius: rad.pill,
+    borderWidth: 1.5,
+    borderColor: c.line,
+    backgroundColor: c.bgAlt,
+  },
+  modalChipSelected: {
+    backgroundColor: c.primary,
+    borderColor: c.primary,
+  },
+  modalChipText: {
+    fontFamily: fnt.m,
+    fontSize: fs.xs,
+    color: c.text2,
+  },
+  modalChipTextSelected: {
+    color: '#FFFFFF',
+    fontFamily: fnt.b,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: c.line,
+    borderRadius: rad.md,
+    paddingHorizontal: sp.sm,
+    paddingVertical: 8,
+    fontFamily: fnt.r,
+    fontSize: fs.sm,
+    color: c.text,
+    backgroundColor: c.bgAlt,
+    marginBottom: sp.sm,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: sp.sm,
+    padding: sp.md,
+    borderTopWidth: 1,
+    borderTopColor: c.line,
+    backgroundColor: c.bgAlt,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
+    borderRadius: rad.md,
+    backgroundColor: c.bgLift,
+  },
+  modalCancelText: {
+    fontFamily: fnt.m,
+    fontSize: fs.sm,
+    color: c.text3,
+  },
+  modalSaveBtn: {
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.xs,
+    borderRadius: rad.md,
+    backgroundColor: c.primary,
+  },
+  modalSaveText: {
+    fontFamily: fnt.b,
+    fontSize: fs.sm,
+    color: '#FFFFFF',
+  },
+
+  /* زر إضافة تقييم جديد في الرأس */
+  addEvalBtn: {
+    marginTop: sp.sm,
+    borderRadius: rad.md,
+    overflow: 'hidden',
+  },
+  addEvalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.xs,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.sm,
+    backgroundColor: c.primary,
+  },
+  addEvalText: {
+    fontFamily: fnt.b,
+    fontSize: fs.sm,
+    color: '#FFFFFF',
+  },
 });
