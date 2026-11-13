@@ -578,24 +578,82 @@ export async function saveEvaluation(input: SaveEvalInput): Promise<Evaluation> 
     (sessionName ?? '').trim() ||
     null;
 
-  const record: Evaluation = {
-    id: input.id ?? newId(),
-    student_id: input.student_id,
-    grade_id: input.grade_id,
-    term: input.term,
-    subject_id: input.subject_id,
-    evaluation_type: input.evaluation_type,
-    evaluation_date: input.evaluation_date,
-    label: input.label.trim(),
-    scores: input.scores,
-    teacher_name: teacherName,
-    updated_at: now,
-    deleted: false,
-  };
+  /**
+   * إذا تم تمرير `input.id`، نحاول تحديث الصف الموجود بنفس `id`،
+   * وإلاّ نبحث عن صف مطوَّر (طالب + مقرر + نوع + فصل + عنوان) ونحدّثه مكاناً.
+   * هذا يمنع إنشاء صفوف مكررة ويحفظ حقول `planned` / `unit` الموجودة.
+   */
+  let record: Evaluation;
 
-  const i = all.findIndex((e) => e.id === record.id);
-  if (i >= 0) all[i] = record;
-  else all.push(record);
+  if (input.id) {
+    // تحديث صريح بمعرفة المعرف
+    const i = all.findIndex((e) => e.id === input.id);
+    const existing = all[i];
+    record = {
+      ...existing,
+      id: input.id ?? existing.id,
+      student_id: input.student_id ?? existing.student_id,
+      grade_id: input.grade_id ?? existing.grade_id,
+      term: input.term ?? existing.term,
+      subject_id: input.subject_id ?? existing.subject_id,
+      evaluation_type: input.evaluation_type ?? existing.evaluation_type,
+      evaluation_date: input.evaluation_date ?? existing.evaluation_date,
+      label: input.label.trim() ?? existing.label,
+      scores: input.scores ?? existing.scores,
+      teacher_name: teacherName ?? existing.teacher_name,
+      updated_at: now,
+      deleted: false,
+    };
+    if (i >= 0) all[i] = record;
+    else all.push(record);
+  } else {
+    // fallback: مطابقة الصف القائم (طالب + مقرر + نوع + فصل + label)
+    const existing = all.find(
+      (e) =>
+        e.student_id === input.student_id &&
+        e.grade_id === input.grade_id &&
+        e.subject_id === input.subject_id &&
+        (e.term ?? 'term1') === input.term &&
+        e.evaluation_type === input.evaluation_type &&
+        (e.label ?? '') === (input.label ?? '') &&
+        !e.deleted
+    );
+
+    if (existing) {
+      // مطابقة موجودة: نحدّث الدرجات في مكانها (preserve planned/unit)
+      record = {
+        ...existing,
+        evaluation_date: input.evaluation_date ?? existing.evaluation_date,
+        label: input.label.trim() ?? existing.label,
+        scores: input.scores ?? existing.scores,
+        teacher_name: teacherName ?? existing.teacher_name,
+        updated_at: now,
+        deleted: false,
+      };
+      const idx = all.findIndex((e) => e.id === existing.id);
+      if (idx >= 0) all[idx] = record;
+    } else {
+      // لا يوجد مطوَّر: ننشئ صفاً جديداً (مع planned:true إن weekly + unit من label)
+      const unit = input.evaluation_type === 'weekly' ? (unitFromLabel(input.label ?? '') ?? undefined) : undefined;
+      record = {
+        id: newId(),
+        student_id: input.student_id,
+        grade_id: input.grade_id,
+        term: input.term,
+        subject_id: input.subject_id,
+        evaluation_type: input.evaluation_type,
+        evaluation_date: input.evaluation_date,
+        label: input.label.trim(),
+        scores: input.scores,
+        teacher_name: teacherName,
+        updated_at: now,
+        deleted: false,
+        planned: input.evaluation_type === 'weekly' ? true : undefined,
+        unit: unit,
+      };
+      all.push(record);
+    }
+  }
 
   await write(K.evaluations, all);
   await enqueue({ table: 'evaluations', op: 'upsert', rowId: record.id, payload: record });

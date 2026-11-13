@@ -201,15 +201,18 @@ export default function EvaluateScreen() {
     setHistory(await evaluationsForStudent(studentId));
   }, [studentId]);
 
+  const dirtyRef = useRef(false);
+
   useEffect(() => {
     if (loadedKeyRef.current === cellKey) return;
     loadedKeyRef.current = cellKey;
+    dirtyRef.current = false; // reset when cell changes
 
     // تصفير ما سبق فوراً حتى لا يظهر تقييمٌ آخر لثانية واحدة
     setScores({});
     setLabel('');
     setDate(todayISO());
-    setEditingId(null);
+    // لا نSetEditingId(null) هنا — يسمح dirtyRef بالتحكم به لاحقاً
     setDraftFound(false);
 
     (async () => {
@@ -256,6 +259,9 @@ export default function EvaluateScreen() {
         }
       }
     })();
+
+    // بعد الانتهاء من التحميل،_mark that we are no longer in "dirty" pending-write state
+    dirtyRef.current = true;
   }, [cellKey, studentId, gradeId, subjectId, kind, editMode, evalId, date]);
 
   /* ---------------- حفظ تلقائي للمسودة ---------------- */
@@ -358,7 +364,9 @@ export default function EvaluateScreen() {
       });
       await clearDraftFor(studentId, kind, saved.evaluation_date);
       await loadHistory();
-      setEditingId(null);
+      // الإبقاء على `editingId = saved.id` لضمان تحديث نفس الاستمارة عند الحفظ مجدداً
+      // (بدلاً من مسحه فينشئ صفاً جديداً مكرراً)
+      setEditingId(saved.id ?? undefined);
       scheduleAutoSync();
 
       if (printAfter) {
